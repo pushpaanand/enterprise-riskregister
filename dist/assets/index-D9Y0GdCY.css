@@ -1,0 +1,1 @@
+:root{--watermark-image: url(/assets/logo-C8jWyv5-.png)}body:after{content:"";position:fixed;top:0;left:0;right:0;bottom:0;background-image:var(--watermark-image);background-repeat:no-repeat;background-position:center;background-size:min(65vw,65vh);opacity:.05;mix-blend-mode:multiply;pointer-events:none;z-index:50}
