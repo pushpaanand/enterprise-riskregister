@@ -1,0 +1,27 @@
+/* Global watermark applied to every page */
+:root {
+	--watermark-image: url('/assets/images/logo.png');
+}
+
+/* Place a faint centered watermark overlay above content (non-interactive) */
+body::after {
+	content: '';
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background-image: var(--watermark-image);
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: min(65vw, 65vh);
+	opacity: 0.05; /* adjust intensity here */
+	mix-blend-mode: multiply;
+	pointer-events: none; /* do not interfere with clicks */
+	z-index: 50; /* above typical content layers */
+}
+
+/* Ensure app content sits above the watermark */
+/* no special z-index for #root needed */
+
+

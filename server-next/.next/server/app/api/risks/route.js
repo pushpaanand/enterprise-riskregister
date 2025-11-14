@@ -1,0 +1,51 @@
+"use strict";(()=>{var e={};e.id=841,e.ids=[841],e.modules={20399:e=>{e.exports=require("next/dist/compiled/next-server/app-page.runtime.prod.js")},30517:e=>{e.exports=require("next/dist/compiled/next-server/app-route.runtime.prod.js")},27790:e=>{e.exports=require("assert")},78893:e=>{e.exports=require("buffer")},61282:e=>{e.exports=require("child_process")},9714:e=>{e.exports=require("constants")},84770:e=>{e.exports=require("crypto")},18139:e=>{e.exports=require("dgram")},80665:e=>{e.exports=require("dns")},17702:e=>{e.exports=require("events")},92048:e=>{e.exports=require("fs")},20629:e=>{e.exports=require("fs/promises")},32615:e=>{e.exports=require("http")},35240:e=>{e.exports=require("https")},98216:e=>{e.exports=require("net")},19801:e=>{e.exports=require("os")},55315:e=>{e.exports=require("path")},76162:e=>{e.exports=require("stream")},74026:e=>{e.exports=require("string_decoder")},95346:e=>{e.exports=require("timers")},82452:e=>{e.exports=require("tls")},74175:e=>{e.exports=require("tty")},17360:e=>{e.exports=require("url")},21764:e=>{e.exports=require("util")},71568:e=>{e.exports=require("zlib")},6005:e=>{e.exports=require("node:crypto")},15673:e=>{e.exports=require("node:events")},88849:e=>{e.exports=require("node:http")},22286:e=>{e.exports=require("node:https")},70612:e=>{e.exports=require("node:os")},97742:e=>{e.exports=require("node:process")},84492:e=>{e.exports=require("node:stream")},41041:e=>{e.exports=require("node:url")},47261:e=>{e.exports=require("node:util")},65628:e=>{e.exports=require("node:zlib")},19513:(e,r,t)=>{t.r(r),t.d(r,{originalPathname:()=>f,patchFetch:()=>R,requestAsyncStorage:()=>E,routeModule:()=>I,serverHooks:()=>N,staticGenerationAsyncStorage:()=>S});var s={};t.r(s),t.d(s,{GET:()=>c,OPTIONS:()=>u,POST:()=>m,runtime:()=>p});var a=t(49303),n=t(88716),o=t(60670),i=t(87070),d=t(9487);let p="nodejs";function l(e){return"string"==typeof e&&(/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(e)||/^00000000-0000-0000-0000-000000000000$/.test(e))}async function c(){let e=await (0,d.M)(),r=await e.request().query(`
+    SELECT r.RiskId, r.RiskNo, r.DepartmentId, d.Name AS Department, r.Name, r.Description,
+           r.CategoryId,
+           r.Identification, r.ExistingControlInPlace, r.PlanOfAction,
+           r.Impact, r.Likelihood, r.Status, r.OwnerId, o.Name AS Owner,
+           r.CreatedByUserId, u.Name AS CreatedByName,
+           r.CreatedAtUtc, r.UpdatedAtUtc
+    FROM dbo.Risks r
+    JOIN dbo.Departments d ON d.DepartmentId = r.DepartmentId
+    LEFT JOIN dbo.Owners o ON o.OwnerId = r.OwnerId
+    LEFT JOIN dbo.Users u ON u.UserId = r.CreatedByUserId
+    ORDER BY d.Name, r.RiskNo
+  `),t=i.NextResponse.json(r.recordset);return t.headers.set("Access-Control-Allow-Origin","*"),t}async function u(){let e=new i.NextResponse(null,{status:204});return e.headers.set("Access-Control-Allow-Origin","*"),e.headers.set("Access-Control-Allow-Headers","Content-Type"),e.headers.set("Access-Control-Allow-Methods","GET, OPTIONS"),e}async function m(e){let r=await e.json(),s=await (0,d.M)(),a=r.departmentId||null;if(!a&&r.createdByUserId&&l(r.createdByUserId)){let e=await s.request().input("uid",r.createdByUserId).query("SELECT DepartmentId FROM dbo.Users WHERE UserId = @uid");e.recordset.length&&(a=e.recordset[0].DepartmentId)}if(!a&&r.createdByName){let e=await s.request().input("uname",r.createdByName).query(`
+      SELECT TOP 1 DepartmentId FROM dbo.Users WHERE Name = @uname
+    `);e.recordset.length&&(a=e.recordset[0].DepartmentId)}if(!a){let e=await s.request().query("SELECT TOP 1 DepartmentId FROM dbo.Departments ORDER BY Name");a=e.recordset[0]?.DepartmentId||null}let n=r.riskNo||null;if(!n&&a){let e=await s.request().input("dep",a).query(`
+      SELECT MAX(CAST(SUBSTRING(RiskNo, 2, 10) AS INT)) AS MaxNo
+      FROM dbo.Risks WHERE DepartmentId = @dep AND ISNUMERIC(SUBSTRING(RiskNo,2,10))=1
+    `),r=(e.recordset[0]?.MaxNo||0)+1;n=`R${String(r).padStart(3,"0")}`}let o=s.request();o.input("DepartmentId",a),o.input("RiskNo",n||r.riskNo),o.input("Name",r.name),o.input("Description",r.description),o.input("Impact",r.impact),o.input("Likelihood",r.likelihood),o.input("Status",r.status);let p=l(r.ownerId)?r.ownerId:null;if(!p){let e=await s.request().query("SELECT TOP 1 OwnerId FROM dbo.Owners ORDER BY Name");p=e.recordset[0]?.OwnerId||null}if(!p){let e=await s.request().input("OwnerName","Default Owner").query(`
+      DECLARE @oid UNIQUEIDENTIFIER = NEWID();
+      INSERT INTO dbo.Owners (OwnerId, Name) VALUES (@oid, @OwnerName);
+      SELECT @oid AS OwnerId;
+    `);p=e.recordset[0]?.OwnerId||null}o.input("OwnerId",p),o.input("CreatedByUserId",l(r.createdByUserId)?r.createdByUserId:null),o.input("CategoryId",r.categoryId||null),o.input("Identification",r.identification||null),o.input("ExistingControlInPlace",r.existingControlInPlace||null),o.input("PlanOfAction",r.planOfAction||null);let c=(await o.query(`
+    DECLARE @id UNIQUEIDENTIFIER = NEWID();
+    INSERT INTO dbo.Risks (RiskId, DepartmentId, RiskNo, Name, Description, CategoryId, Identification, ExistingControlInPlace, PlanOfAction, Impact, Likelihood, Status, OwnerId, CreatedByUserId, CreatedAtUtc, UpdatedAtUtc)
+    VALUES (@id, @DepartmentId, @RiskNo, @Name, @Description, @CategoryId, @Identification, @ExistingControlInPlace, @PlanOfAction, @Impact, @Likelihood, @Status, @OwnerId, @CreatedByUserId, SYSUTCDATETIME(), SYSUTCDATETIME());
+    SELECT r.RiskId, r.RiskNo, r.DepartmentId, d.Name AS Department, r.Name, r.Description,
+           r.CategoryId, r.Identification, r.ExistingControlInPlace, r.PlanOfAction,
+           r.Impact, r.Likelihood, r.Status, r.OwnerId,
+           r.CreatedByUserId, u.Name AS CreatedByName,
+           r.CreatedAtUtc, r.UpdatedAtUtc
+    FROM dbo.Risks r
+    JOIN dbo.Departments d ON d.DepartmentId = r.DepartmentId
+    LEFT JOIN dbo.Users u ON u.UserId = r.CreatedByUserId
+    WHERE r.RiskId = @id;
+  `)).recordset[0];try{let e=await s.request().input("dep",c.DepartmentId).query(`
+      SELECT TOP 5 Email FROM dbo.Users WHERE Role = 'manager' AND DepartmentId = @dep AND Email IS NOT NULL
+    `);if(e.recordset.length){let r=e.recordset.map(e=>e.Email).join(","),s=e.recordset.map(e=>String(e.Email)),{default:a}=await t.e(245).then(t.t.bind(t,55245,19)),n=process.env.SMTP_FROM||process.env.SMTP_USER||"productanalyst.pushpa@kauveryhospital.com",o=`Approval needed: ${c.RiskNo} - ${c.Name}`,i=`Dear Manager,
+
+A new risk has been raised and requires your approval.
+
+Risk ID: ${c.RiskNo}
+Title: ${c.Name}
+Raised By: ${c.CreatedByName||"Unknown"}
+Impact: ${c.Impact}
+Likelihood: ${c.Likelihood}
+Identification: ${c.Identification||""}
+Status: ${c.Status}
+
+Please log in to review and take action.
+
+Thanks.`;if("false"!==(process.env.SMTP_ENABLED||"true").toLowerCase()){let e=process.env.MS_TENANT_ID,t=process.env.MS_CLIENT_ID,d=process.env.MS_CLIENT_SECRET,p=process.env.MS_GRAPH_SENDER||n,l=!!(e&&t&&d&&p),c=async()=>{let r=await fetch(`https://login.microsoftonline.com/${e}/oauth2/v2.0/token`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({client_id:t,client_secret:d,scope:"https://graph.microsoft.com/.default",grant_type:"client_credentials"})});if(!r.ok){let e=await r.text();throw Error(`Graph token failed: ${r.status} ${e}`)}let a=(await r.json()).access_token,n=s.map(e=>({emailAddress:{address:e}})),l=await fetch(`https://graph.microsoft.com/v1.0/users/${encodeURIComponent(p)}/sendMail`,{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${a}`},body:JSON.stringify({message:{subject:o,body:{contentType:"Text",content:i},toRecipients:n},saveToSentItems:"false"})});if(!l.ok){let e=await l.text();throw Error(`Graph sendMail failed: ${l.status} ${e}`)}console.info("Email sent via Microsoft Graph")},u="true"===process.env.SMTP_TLS_REJECT_UNAUTHORIZED,m=(process.env.SMTP_USER||"productanalyst.pushpa@kauveryhospital.com").trim(),I=(process.env.SMTP_PASS||"fprg nbfn ftat hngt").trim(),E=""!==m&&""!==I;if(console.log("hasSmtpCreds",m,I),!E){if(l)try{await c()}catch(e){console.error("Email notify failed via Graph (no SMTP creds)",e)}else console.error("Email notify skipped: missing SMTP_USER/SMTP_PASS and no Graph credentials configured");return}let S=a.createTransport({service:"gmail",auth:{user:m,pass:I},tls:{rejectUnauthorized:u},debug:"true"===process.env.SMTP_DEBUG});try{await S.sendMail({from:n,to:r,subject:o,text:i})}catch(e){if(e&&("EAUTH"===e.code||`${e}`.includes("535")||`${e}`.toLowerCase().includes("missing credentials"))&&l)try{await c()}catch(e){console.error("Email notify failed via SMTP and Graph",e)}else console.error("Email notify failed via SMTP",e)}}else console.warn("Email notify skipped: SMTP_ENABLED=false")}}catch(e){console.error("Email notify failed",e)}let u=i.NextResponse.json({ok:!0,risk:c},{status:201});return u.headers.set("Access-Control-Allow-Origin","*"),u}let I=new a.AppRouteRouteModule({definition:{kind:n.x.APP_ROUTE,page:"/api/risks/route",pathname:"/api/risks",filename:"route",bundlePath:"app/api/risks/route"},resolvedPagePath:"C:\\Users\\127547.INDIA\\Documents\\enterprise-risk-management-dashboard\\server-next\\app\\api\\risks\\route.ts",nextConfigOutput:"",userland:s}),{requestAsyncStorage:E,staticGenerationAsyncStorage:S,serverHooks:N}=I,f="/api/risks/route";function R(){return(0,o.patchFetch)({serverHooks:N,staticGenerationAsyncStorage:S})}},9487:(e,r,t)=>{t.d(r,{M:()=>i});var s=t(33049),a=t.n(s),n=t(16636);t.n(n)().config({path:".env.local"});let o=null;async function i(){if(o&&o.connected)return o;o&&!o.connected&&await o.close();let e={server:process.env.DB_SERVER||"riskmanage.database.windows.net",database:process.env.DB_NAME||"riskmanagement",user:process.env.DB_USER||"riskmanagement",password:process.env.DB_PASSWORD||"RiskManage@123",port:Number(process.env.DB_PORT)||1433,options:{encrypt:!0,trustServerCertificate:!1},pool:{max:10,min:0,idleTimeoutMillis:3e4}};return o=await new(a()).ConnectionPool(e).connect()}}};var r=require("../../../webpack-runtime.js");r.C(e);var t=e=>r(r.s=e),s=r.X(0,[542,181,49],()=>t(19513));module.exports=s})();
