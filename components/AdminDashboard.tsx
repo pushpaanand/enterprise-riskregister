@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { User } from '../types';
 import UserAdminPage from './UserAdminPage';
 import DepartmentAdminPage from './DepartmentAdminPage';
-import UnitHeadMailer from './UnitHeadMailer';
+import UnitHeadMailer, { ManagerMailer } from './UnitHeadMailer';
 
 interface AdminDashboardProps {
     users: User[];
@@ -11,7 +11,7 @@ interface AdminDashboardProps {
     onUpdateUser?: (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
 }
 
-type AdminTab = 'users' | 'departments' | 'email';
+type AdminTab = 'users' | 'departments' | 'email' | 'emailManagers';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -50,6 +50,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     >
                         Email Unit Heads
                     </button>
+                    <button
+                        onClick={() => setActiveTab('emailManagers')}
+                        className={`${
+                            activeTab === 'emailManagers'
+                                ? 'border-brand-primary text-brand-primary'
+                                : 'border-transparent text-base-content-muted dark:text-dark-content-muted hover:border-gray-300 dark:hover:border-gray-700 hover:text-base-content dark:hover:text-dark-content'
+                        } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors`}
+                    >
+                        Email Managers
+                    </button>
                 </nav>
             </div>
 
@@ -67,6 +77,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 )}
                 {activeTab === 'email' && (
                     <UnitHeadMailer />
+                )}
+                {activeTab === 'emailManagers' && (
+                    <ManagerMailer />
                 )}
             </div>
         </div>

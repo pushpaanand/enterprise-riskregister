@@ -19,6 +19,7 @@ interface RiskDashboardProps {
   onSaveRisk: (risk: Omit<Risk, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   onDeleteRisk: (riskId: string) => void;
   onApproveRisk?: (risk: Risk) => void;
+  onRejectRisk?: (risk: Risk, reason: string) => void;
   incidents?: Incident[];
   incidentHistory?: IncidentHistory[];
   onAddIncident?: (riskId: string, description: string) => void;
@@ -36,7 +37,7 @@ interface RiskDashboardProps {
   onChangeAdminDept?: (v: string) => void;
 }
 
-const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept }) => {
+const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [riskToEdit, setRiskToEdit] = useState<Risk | null>(null);
   const summary = aiSummary || '';
@@ -64,6 +65,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [newRiskPage, setNewRiskPage] = useState<number>(1);
   const [incPage, setIncPage] = useState<number>(1);
   const [incPageSize, setIncPageSize] = useState<number>(10);
+  const [rejectTarget, setRejectTarget] = useState<Risk | null>(null);
+  const [rejectReason, setRejectReason] = useState<string>('');
   
   const openEditModal = (risk: Risk) => {
     setRiskToEdit(risk);
@@ -273,7 +276,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
               >
-                {['All','Raised','New','Existing','Downgraded','Upgraded','Eliminated'].map(opt => (
+                {['All','Raised','Rejected','New','Existing','Downgraded','Upgraded','Eliminated','Open','Closed','In Progress'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
@@ -307,20 +310,21 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <>
                 <RiskTable
                   risks={pageItems}
-            owners={owners}
-            users={users}
-            currentUser={currentUser}
-            onEdit={openEditModal}
-            onDelete={onDeleteRisk}
-            onApprove={onApproveRisk}
-            onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
-            incidentCounts={(() => {
-              const counts: Record<string, number> = {};
-              (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
-              return counts;
-            })()}
-            onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
-            onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
+                  owners={owners}
+                  users={users}
+                  currentUser={currentUser}
+                  onEdit={openEditModal}
+                  onDelete={onDeleteRisk}
+                  onApprove={onApproveRisk}
+                  onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
+                  onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+                  incidentCounts={(() => {
+                    const counts: Record<string, number> = {};
+                    (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
+                    return counts;
+                  })()}
+                  onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
+                  onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
                 />
                 <div className="mt-3 flex items-center justify-end gap-3 text-sm">
                   <label className="flex items-center gap-1 text-base-content-muted dark:text-dark-content-muted">
@@ -360,7 +364,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           </div>
           {(() => {
-            let base = risks.filter(r => r.status === 'New');
+            // Show both newly created and rejected risks in this queue
+            let base = risks.filter(r => r.status === 'New' || r.status === 'Rejected');
             if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
               base = base.filter(r => String(r.department || '') === adminDept);
             }
@@ -374,20 +379,21 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <>
                 <RiskTable
                   risks={pageItems}
-            owners={owners}
-            users={users}
-            currentUser={currentUser}
-            onEdit={openEditModal}
-            onDelete={onDeleteRisk}
-            onApprove={onApproveRisk}
-            onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
-            incidentCounts={(() => {
-              const counts: Record<string, number> = {};
-              (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
-              return counts;
-            })()}
-            onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
-            onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
+                  owners={owners}
+                  users={users}
+                  currentUser={currentUser}
+                  onEdit={openEditModal}
+                  onDelete={onDeleteRisk}
+                  onApprove={onApproveRisk}
+                  onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
+                  onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+                  incidentCounts={(() => {
+                    const counts: Record<string, number> = {};
+                    (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
+                    return counts;
+                  })()}
+                  onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
+                  onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
                 />
                 <div className="mt-3 flex items-center justify-end gap-3 text-sm">
                   <label className="flex items-center gap-1 text-base-content-muted dark:text-dark-content-muted">
@@ -407,7 +413,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </>
             );
           })()}
-          <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">Showing risks with Status = New.</div>
+          <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">
+            Showing risks with Status = New or Rejected.
+          </div>
         </div>
       ) : (
         <div className="mt-8 space-y-6">
@@ -510,6 +518,51 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
           })()}
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(rejectTarget)}
+        onClose={() => { setRejectTarget(null); setRejectReason(''); }}
+        title="Reject Risk"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-base-content dark:text-dark-content">
+            Please provide a reason for rejecting the risk <strong>{rejectTarget?.riskNo || rejectTarget?.name}</strong>.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-base-content dark:text-dark-content mb-1">Reason</label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={4}
+              className="w-full rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-2 text-sm text-base-content dark:text-dark-content focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              placeholder="Explain why this risk is being rejected..."
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => { setRejectTarget(null); setRejectReason(''); }}
+              className="px-3 py-2 text-sm rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 hover:bg-base-200 dark:hover:bg-dark-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!rejectReason.trim()}
+              onClick={() => {
+                if (rejectTarget && onRejectRisk) {
+                  onRejectRisk(rejectTarget, rejectReason.trim());
+                }
+                setRejectTarget(null);
+                setRejectReason('');
+              }}
+              className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
+            >
+              Reject Risk
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <RiskFormModal
         isOpen={isModalOpen}

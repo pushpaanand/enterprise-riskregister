@@ -2,8 +2,10 @@ export type Theme = 'light' | 'dark' | 'system';
 
 export type RiskStatus =
   | 'Raised'
+  | 'Rejected'
   | 'Open'
   | 'Closed'
+  | 'In Progress'
   | 'Existing'
   | 'New'
   | 'Downgraded'
@@ -55,6 +57,7 @@ export interface Risk {
   department?: string; // department owning/raising the risk
   createdAt: string;
   updatedAt: string;
+  rejectionReason?: string | null;
 }
 
 export interface Incident {

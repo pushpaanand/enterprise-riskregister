@@ -27,7 +27,7 @@ export async function GET(
     const rs = await pool.request().input('RiskId', riskId).query(`
       SELECT h.RiskHistoryId, h.RiskId, h.ChangedAtUtc,
              h.ChangedByUserId, u.Name AS ChangedByName,
-             h.FieldName, h.OldValue, h.NewValue
+             h.FieldName, h.OldValue, h.NewValue, h.RejectionReason
       FROM dbo.riskhistory h
       LEFT JOIN dbo.Users u ON u.UserId = h.ChangedByUserId
       WHERE h.RiskId = @RiskId

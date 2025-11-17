@@ -11,6 +11,7 @@ interface Entry {
   FieldName: string;
   OldValue?: string | null;
   NewValue?: string | null;
+  RejectionReason?: string | null;
 }
 
 interface RiskChangeHistoryModalProps {
@@ -64,11 +65,12 @@ const RiskChangeHistoryModal: React.FC<RiskChangeHistoryModalProps> = ({ isOpen,
                 <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Field</th>
                 <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Old Value</th>
                 <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">New Value</th>
+                <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Reason</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-base-300 dark:divide-dark-300">
               {loading && (
-                <tr><td colSpan={5} className="px-3 py-3 text-sm">Loading...</td></tr>
+                <tr><td colSpan={6} className="px-3 py-3 text-sm">Loading...</td></tr>
               )}
               {!loading && entries.map(e => (
                 <tr key={`${e.RiskHistoryId}`} className="hover:bg-base-100 dark:hover:bg-dark-100">
@@ -77,10 +79,11 @@ const RiskChangeHistoryModal: React.FC<RiskChangeHistoryModalProps> = ({ isOpen,
                   <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{e.FieldName}</td>
                   <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{e.OldValue ?? ''}</td>
                   <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{e.NewValue ?? ''}</td>
+                  <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{e.RejectionReason ?? ''}</td>
                 </tr>
               ))}
               {!loading && entries.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-4 text-center text-sm text-base-content-muted dark:text-dark-content-muted">No changes recorded.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-4 text-center text-sm text-base-content-muted dark:text-dark-content-muted">No changes recorded.</td></tr>
               )}
             </tbody>
           </table>

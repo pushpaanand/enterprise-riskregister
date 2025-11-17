@@ -15,12 +15,14 @@ const UserIcon = () => (
 
 const UserSwitcher: React.FC<UserSwitcherProps> = ({ users, currentUser, onUserChange }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [showAll, setShowAll] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
+                setShowAll(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
@@ -32,7 +34,10 @@ const UserSwitcher: React.FC<UserSwitcherProps> = ({ users, currentUser, onUserC
     return (
         <div className="relative" ref={dropdownRef}>
             <button
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => {
+                    setIsOpen(prev => !prev);
+                    if (isOpen) setShowAll(false);
+                }}
                 className="flex items-center gap-2 rounded-md bg-base-300/50 dark:bg-dark-300 px-3 py-2 text-sm font-medium text-base-content dark:text-dark-content hover:bg-base-300 dark:hover:bg-dark-200 transition-colors"
                 aria-label={`Current user: ${currentUser.name}`}
             >
@@ -40,15 +45,27 @@ const UserSwitcher: React.FC<UserSwitcherProps> = ({ users, currentUser, onUserC
                 <span>{currentUser.name} ({currentUser.role})</span>
             </button>
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 origin-top-right rounded-md bg-base-200 dark:bg-dark-200 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                <div className="absolute right-0 mt-2 w-60 origin-top-right rounded-md bg-base-200 dark:bg-dark-200 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
-                        <div className="px-4 py-2 text-xs text-base-content-muted dark:text-dark-content-muted">Switch User</div>
-                        {users.map(user => (
+                        <div className="px-4 py-2 text-xs text-base-content-muted dark:text-dark-content-muted flex items-center justify-between">
+                            <span>Switch User</span>
+                            {users.length > 3 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowAll(prev => !prev)}
+                                    className="text-brand-primary hover:underline text-[11px]"
+                                >
+                                    {showAll ? 'View less' : `View all (${users.length})`}
+                                </button>
+                            )}
+                        </div>
+                        {(showAll ? users : users.slice(0, 3)).map(user => (
                             <button
                                 key={user.id}
                                 onClick={() => {
                                     onUserChange(user.id);
                                     setIsOpen(false);
+                                    setShowAll(false);
                                 }}
                                 className={`w-full text-left flex items-center gap-3 px-4 py-2 text-sm ${
                                     currentUser.id === user.id
@@ -60,6 +77,11 @@ const UserSwitcher: React.FC<UserSwitcherProps> = ({ users, currentUser, onUserC
                                 <span className="flex-1">{user.name} ({user.role})</span>
                             </button>
                         ))}
+                        {!showAll && users.length > 3 && (
+                            <div className="px-4 py-2 text-xs text-base-content-muted dark:text-dark-content-muted">
+                                {users.length - 3} more user{users.length - 3 === 1 ? '' : 's'}
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -9,6 +9,7 @@ interface RiskTableProps {
   onEdit: (risk: Risk) => void;
   onDelete: (riskId: string) => void;
   onApprove?: (risk: Risk) => void;
+  onReject?: (risk: Risk) => void;
   onRowClick?: (risk: Risk) => void;
   onViewIncidents?: (risk: Risk) => void;
   onViewRiskHistory?: (risk: Risk) => void;
@@ -26,6 +27,10 @@ const impactColorMap: Record<string, string> = {
 const statusColorMap: Record<string, string> = {
   // Legacy workflow values
   'Raised': 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
+  'Rejected': 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300',
+  'In Progress': 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-300',
+  'Open': 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
+  'Closed': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
   // New classification values used as stage
   'New': 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
   'Existing': 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-300',
@@ -34,7 +39,7 @@ const statusColorMap: Record<string, string> = {
   'Eliminated': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
 };
 
-const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser, onEdit, onDelete, onApprove, onRowClick, onViewIncidents, onViewRiskHistory, incidentCounts = {} }) => {
+const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser, onEdit, onDelete, onApprove, onReject, onRowClick, onViewIncidents, onViewRiskHistory, incidentCounts = {} }) => {
   const getOwnerName = (ownerId: string) => {
     return owners.find(o => o.id === ownerId)?.name || 'Unknown';
   };
@@ -93,7 +98,14 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.likelihood || 'Possible'}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm">
-                 <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${statusColorMap[risk.status]}`}>{risk.status}</span>
+                <div className="flex flex-col gap-1">
+                  <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${statusColorMap[risk.status] || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'}`}>{risk.status}</span>
+                  {risk.status === 'Rejected' && risk.rejectionReason && (
+                    <span className="text-xs text-red-600 dark:text-red-400 max-w-[220px] break-words">
+                      Reason: {risk.rejectionReason}
+                    </span>
+                  )}
+                </div>
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{getRaisedBy(risk)}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm">
@@ -128,7 +140,20 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
                   {currentUser?.role === 'manager' && (
                     <>
                       {risk.status === 'Raised' && (
-                        <button onClick={() => onApprove && onApprove(risk)} className="mr-4 text-green-600 hover:text-green-700">Approve</button>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => onApprove && onApprove(risk)}
+                            className="text-green-600 hover:text-green-700"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => onReject && onReject(risk)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Reject
+                          </button>
+                        </div>
                       )}
                       <button onClick={() => onEdit(risk)} className="text-brand-primary hover:opacity-80">Edit</button>
                       <button onClick={() => onDelete(risk.id)} className="ml-4 text-red-500 hover:text-red-700">Delete</button>

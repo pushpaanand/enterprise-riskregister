@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Risk, Owner, User, Incident, IncidentHistory } from './types';
 import { initialRisks, initialOwners, initialUsers } from './data';
 import RiskDashboard from './components/RiskDashboard';
@@ -8,6 +8,41 @@ import ThemeToggle from './components/ThemeToggle';
 import UserSwitcher from './components/UserSwitcher';
 import Login from './components/Login';
 import { API_BASE_URL, apiUrl } from './api';
+
+type LinkAction = {
+    riskId: string;
+    action: 'approve';
+};
+
+function parseLinkActionFromLocation(): LinkAction | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const url = new URL(window.location.href);
+        const segments = url.pathname.split('/').filter(Boolean);
+        if (segments.length >= 2 && segments[0].toLowerCase() === 'risks') {
+            const riskId = decodeURIComponent(segments[1]);
+            const actionParam = url.searchParams.get('action');
+            if (actionParam && actionParam.toLowerCase() === 'approve') {
+                return { riskId, action: 'approve' };
+            }
+        }
+    } catch {
+        // ignore parse errors
+    }
+    return null;
+}
+
+function clearLinkActionFromUrl() {
+    if (typeof window === 'undefined') return;
+    try {
+        const url = new URL(window.location.href);
+        const basePath = url.pathname.split('/risks/')[0] || '/';
+        const normalized = basePath.endsWith('/') ? basePath : `${basePath}/`;
+        window.history.replaceState({}, document.title, normalized);
+    } catch {
+        window.history.replaceState({}, document.title, '/');
+    }
+}
 
 const App: React.FC = () => {
     // State management with localStorage persistence
@@ -50,6 +85,8 @@ const App: React.FC = () => {
     const [aiIncidentsLoading, setAiIncidentsLoading] = useState<boolean>(false);
     const hasAppliedStatusAging = useRef<boolean>(false);
     const [summaryRiskId, setSummaryRiskId] = useState<string | null>(null);
+    const [pendingLinkAction, setPendingLinkAction] = useState<LinkAction | null>(() => parseLinkActionFromLocation());
+    const linkActionProcessingRef = useRef(false);
 
     useEffect(() => {
         localStorage.setItem('risks', JSON.stringify(risks));
@@ -109,6 +146,7 @@ const App: React.FC = () => {
                             existingControlInPlace: r.ExistingControlInPlace || r.existingControlInPlace || '',
                                 identification: r.Identification || r.identification || undefined,
                             planOfAction: r.PlanOfAction || r.planOfAction || '',
+                        rejectionReason: r.RejectionReason || r.rejectionReason || null,
                             classificationStatus: r.ClassificationStatus || r.classificationStatus || undefined,
                             department: r.Department || r.department || undefined,
                         }));
@@ -274,6 +312,119 @@ const App: React.FC = () => {
         setCurrentUser(user);
     };
 
+    const currentUserId = currentUser?.id;
+
+    const syncUsersFromApi = useCallback(async (focusUserId?: string) => {
+        try {
+            const res = await fetch(apiUrl('/users'));
+            if (!res.ok) {
+                const detail = await res.text().catch(() => '');
+                // eslint-disable-next-line no-console
+                console.error('Failed to load users from API', res.status, detail);
+                return false;
+            }
+            const data = await res.json();
+            if (!Array.isArray(data)) return false;
+            const normalizeRole = (input: unknown): User['role'] => {
+                const value = typeof input === 'string' ? input.toLowerCase() : 'user';
+                if (value === 'admin' || value === 'manager' || value === 'unit_head' || value === 'user') {
+                    return value as User['role'];
+                }
+                return 'user';
+            };
+            const mapped: User[] = data
+                .map((apiUser: any) => ({
+                    id: apiUser.UserId || apiUser.userId || apiUser.id,
+                    name: apiUser.Name || apiUser.name || '',
+                    email: apiUser.Email || apiUser.email || undefined,
+                    role: normalizeRole(apiUser.Role || apiUser.role),
+                    department: apiUser.Department || apiUser.department || undefined,
+                    unit: apiUser.Unit || apiUser.unit || undefined,
+                    isUnitHead: Boolean(apiUser.IsUnitHead ?? apiUser.isUnitHead),
+                    employeeId: apiUser.EmployeeId || apiUser.employeeId || undefined,
+                }))
+                .filter((u: User) => Boolean(u.id && u.name));
+            setUsers(mapped);
+            const targetId = focusUserId || currentUserId;
+            if (targetId) {
+                const updatedCurrent = mapped.find(u => u.id === targetId);
+                if (updatedCurrent) {
+                    setCurrentUser(updatedCurrent);
+                }
+            }
+            return true;
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to load users from API', error);
+            return false;
+        }
+    }, [currentUserId]);
+
+    useEffect(() => {
+        if (!currentUserId) return;
+        syncUsersFromApi(currentUserId);
+    }, [currentUserId, syncUsersFromApi]);
+
+    useEffect(() => {
+        if (!pendingLinkAction) return;
+        if (!currentUser) return;
+        if (linkActionProcessingRef.current) return;
+
+        if (pendingLinkAction.action === 'approve') {
+            if (!(currentUser.role === 'manager' || currentUser.role === 'admin')) {
+                alert('Only managers or admins can approve risks.');
+                setPendingLinkAction(null);
+                clearLinkActionFromUrl();
+                return;
+            }
+            linkActionProcessingRef.current = true;
+            (async () => {
+                try {
+                    const res = await fetch(apiUrl(`/risks/${pendingLinkAction.riskId}`), {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            status: 'Open',
+                            changedByUserId: currentUser.id,
+                        }),
+                    });
+                    let responseBody: any = null;
+                    try {
+                        responseBody = await res.json();
+                    } catch {
+                        responseBody = null;
+                    }
+                    if (!res.ok) {
+                        const message = responseBody?.error || `Failed with status ${res.status}`;
+                        throw new Error(message);
+                    }
+                    const timestamp = new Date().toISOString();
+                    setRisks(prev =>
+                        prev.map(r =>
+                            r.id === pendingLinkAction.riskId
+                                ? { ...r, status: 'Open', rejectionReason: null, updatedAt: timestamp }
+                                : r
+                        )
+                    );
+                    setAllRisks(prev =>
+                        prev.map(r =>
+                            r.id === pendingLinkAction.riskId
+                                ? { ...r, status: 'Open', rejectionReason: null, updatedAt: timestamp }
+                                : r
+                        )
+                    );
+                    alert('Risk approved successfully.');
+                } catch (err: any) {
+                    alert(`Failed to approve risk automatically: ${err?.message || err}`);
+                } finally {
+                    linkActionProcessingRef.current = false;
+                    setPendingLinkAction(null);
+                    clearLinkActionFromUrl();
+                }
+            })();
+        }
+    }, [pendingLinkAction, currentUser]);
+
     const handleLogout = () => {
         localStorage.removeItem('currentUserId');
         setCurrentUser(null);
@@ -298,6 +449,7 @@ const App: React.FC = () => {
                         identification: (riskData as any).identification,
                         existingControlInPlace: (riskData as any).existingControlInPlace,
                         planOfAction: (riskData as any).planOfAction,
+                        rejectionReason: (riskData as any).rejectionReason ?? null,
                         changedByUserId: currentUser?.id,
                         // categoryId: optional mapping if you have ids; skipping here
                     })
@@ -306,21 +458,34 @@ const App: React.FC = () => {
                 // eslint-disable-next-line no-console
                 console.error('Failed to update risk in backend', e);
             }
-            setRisks(risks.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: new Date().toISOString() } : r));
+            const timestamp = new Date().toISOString();
+            setRisks(prev => prev.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: timestamp } : r));
+            setAllRisks(prev => prev.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: timestamp } : r));
         } else {
             // Add
-            // Determine department (ignore owner, use logged-in user's department)
-            const deptFromUser = currentUser?.department;
-            const department = deptFromUser || 'General';
+            // Determine department (prefer risk selection, then user's department)
+            const deptFromUser = currentUser?.department?.trim();
+            const department =
+                (riskData.department && riskData.department.trim()) ||
+                (deptFromUser && deptFromUser.trim()) ||
+                'General';
 
-            // Compute next risk number for this department (R001, R002, ...)
-            const prefix = 'R';
+            // Compute next risk number for this department (e.g., O001, M002)
+            const derivePrefix = (name: string | undefined | null) => {
+                if (!name) return 'R';
+                const match = name.trim().toUpperCase().match(/[A-Z]/);
+                return match ? match[0] : 'R';
+            };
+            const normalizedDept = (department || '').trim().toLowerCase();
+            const prefix = derivePrefix(department);
             const currentMax = risks
-                .filter(r => (r.department) === department)
+                .filter(r => (r.department || '').trim().toLowerCase() === normalizedDept)
                 .map(r => {
-                    const no = (r.riskNo || '').replace(/^R/i, '');
-                    const parsed = parseInt(no, 10);
-                    return isNaN(parsed) ? 0 : parsed;
+                    const riskNoValue = (r.riskNo || '').toString().trim().toUpperCase();
+                    if (!riskNoValue.startsWith(prefix) || riskNoValue.length < 2) return 0;
+                    const numericPart = riskNoValue.substring(1);
+                    const parsed = parseInt(numericPart, 10);
+                    return Number.isNaN(parsed) ? 0 : parsed;
                 })
                 .reduce((a, b) => Math.max(a, b), 0);
             const nextNo = String(currentMax + 1).padStart(3, '0');
@@ -330,6 +495,7 @@ const App: React.FC = () => {
             const payload = {
                 departmentId: undefined, // resolved server-side by createdByUserId
                 riskNo: undefined,       // auto-generated server-side
+                departmentName: department,
                 name: riskData.name,
                 description: riskData.description,
                 impact: riskData.impact,
@@ -342,6 +508,7 @@ const App: React.FC = () => {
                 identification: (riskData as any).identification,
                 existingControlInPlace: (riskData as any).existingControlInPlace,
                 planOfAction: (riskData as any).planOfAction,
+                rejectionReason: (riskData as any).rejectionReason ?? null,
             };
             try {
                 const res = await fetch(apiUrl('/risks'), {
@@ -371,8 +538,10 @@ const App: React.FC = () => {
                         department: r.Department,
                         createdAt: r.CreatedAtUtc || new Date().toISOString(),
                         updatedAt: r.UpdatedAtUtc || new Date().toISOString(),
+                        rejectionReason: r.RejectionReason || null,
                     };
-                    setRisks([mapped, ...risks]);
+                    setRisks(prev => [mapped, ...prev]);
+                    setAllRisks(prev => [mapped, ...prev]);
                 } else {
                     // Fallback to local add if server rejects
                     const newRisk: Risk = {
@@ -380,12 +549,14 @@ const App: React.FC = () => {
                         id: `r${Date.now()}`,
                         riskNo,
                         department,
+                        rejectionReason: (riskData as any).rejectionReason ?? null,
                         createdByUserId: currentUser?.id,
                         createdAt: new Date().toISOString(),
                         updatedAt: new Date().toISOString(),
                     };
                     if (currentUser?.role === 'user') (newRisk as any).status = 'Raised';
-                    setRisks([newRisk, ...risks]);
+                    setRisks(prev => [newRisk, ...prev]);
+                    setAllRisks(prev => [newRisk, ...prev]);
                 }
             } catch {
                 const newRisk: Risk = {
@@ -393,12 +564,14 @@ const App: React.FC = () => {
                     id: `r${Date.now()}`,
                     riskNo,
                     department,
+                    rejectionReason: (riskData as any).rejectionReason ?? null,
                     createdByUserId: currentUser?.id,
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                 };
                 if (currentUser?.role === 'user') (newRisk as any).status = 'Raised';
-                setRisks([newRisk, ...risks]);
+                setRisks(prev => [newRisk, ...prev]);
+                setAllRisks(prev => [newRisk, ...prev]);
             }
         }
     };
@@ -456,7 +629,13 @@ const App: React.FC = () => {
                 isUnitHead: Boolean(apiUser.IsUnitHead),
                 employeeId: apiUser.EmployeeId || undefined,
             };
-            setUsers([newUser, ...users]);
+            const synced = await syncUsersFromApi();
+            if (!synced) {
+                setUsers((prev) => {
+                    const deduped = prev.filter(u => u.id !== newUser.id);
+                    return [newUser, ...deduped];
+                });
+            }
         } catch (e) {
             // eslint-disable-next-line no-alert
             alert(String((e as any)?.message || e));
@@ -491,7 +670,10 @@ const App: React.FC = () => {
                 isUnitHead: Boolean(apiUser.IsUnitHead),
                 employeeId: apiUser.EmployeeId || undefined,
             };
-            setUsers(users.map(u => u.id === id ? updated : u));
+            const synced = await syncUsersFromApi();
+            if (!synced) {
+                setUsers((prev) => prev.map(u => u.id === id ? updated : u));
+            }
         } catch (e) {
             // eslint-disable-next-line no-alert
             alert(String((e as any)?.message || e));
@@ -714,6 +896,29 @@ const App: React.FC = () => {
                                 likelihood: risk.likelihood,
                                 status: 'New',
                                 ownerId: risk.ownerId,
+                                riskNo: risk.riskNo,
+                                department: risk.department,
+                                identification: risk.identification,
+                                existingControlInPlace: risk.existingControlInPlace,
+                                planOfAction: risk.planOfAction,
+                                rejectionReason: null,
+                            })}
+                            onRejectRisk={(risk, reason) => handleSaveRisk({
+                                id: risk.id,
+                                name: risk.name,
+                                description: risk.description,
+                                category: risk.category,
+                                subcategory: risk.subcategory,
+                                impact: risk.impact,
+                                likelihood: risk.likelihood,
+                                status: 'Rejected',
+                                ownerId: risk.ownerId,
+                                riskNo: risk.riskNo,
+                                department: risk.department,
+                                identification: risk.identification,
+                                existingControlInPlace: risk.existingControlInPlace,
+                                planOfAction: risk.planOfAction,
+                                rejectionReason: reason,
                             })}
                             incidents={incidents.filter(i => risks.some(r => r.id === i.riskId))}
                             incidentHistory={incidentHistory}
@@ -852,6 +1057,29 @@ const App: React.FC = () => {
                                         likelihood: risk.likelihood,
                                         status: 'New',
                                         ownerId: risk.ownerId,
+                                        riskNo: risk.riskNo,
+                                        department: risk.department,
+                                        identification: risk.identification,
+                                        existingControlInPlace: risk.existingControlInPlace,
+                                        planOfAction: risk.planOfAction,
+                                        rejectionReason: null,
+                                    })}
+                                    onRejectRisk={(risk, reason) => handleSaveRisk({
+                                        id: risk.id,
+                                        name: risk.name,
+                                        description: risk.description,
+                                        category: risk.category,
+                                        subcategory: risk.subcategory,
+                                        impact: risk.impact,
+                                        likelihood: risk.likelihood,
+                                        status: 'Rejected',
+                                        ownerId: risk.ownerId,
+                                        riskNo: risk.riskNo,
+                                        department: risk.department,
+                                        identification: risk.identification,
+                                        existingControlInPlace: risk.existingControlInPlace,
+                                        planOfAction: risk.planOfAction,
+                                        rejectionReason: reason,
                                     })}
                                     /* restrict incidents to manager's dept risks */
                                     incidents={incidents.filter(i => filteredRisks.some(fr => fr.id === i.riskId))}
@@ -1028,6 +1256,29 @@ const App: React.FC = () => {
                                     likelihood: risk.likelihood,
                                     status: 'New',
                                     ownerId: risk.ownerId,
+                                    riskNo: risk.riskNo,
+                                    department: risk.department,
+                                    identification: risk.identification,
+                                    existingControlInPlace: risk.existingControlInPlace,
+                                    planOfAction: risk.planOfAction,
+                                    rejectionReason: null,
+                                })}
+                                onRejectRisk={(risk, reason) => handleSaveRisk({
+                                    id: risk.id,
+                                    name: risk.name,
+                                    description: risk.description,
+                                    category: risk.category,
+                                    subcategory: risk.subcategory,
+                                    impact: risk.impact,
+                                    likelihood: risk.likelihood,
+                                    status: 'Rejected',
+                                    ownerId: risk.ownerId,
+                                    riskNo: risk.riskNo,
+                                    department: risk.department,
+                                    identification: risk.identification,
+                                    existingControlInPlace: risk.existingControlInPlace,
+                                    planOfAction: risk.planOfAction,
+                                    rejectionReason: reason,
                                 })}
                                 incidents={incidents}
                                 incidentHistory={incidentHistory}

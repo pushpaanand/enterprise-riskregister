@@ -29,6 +29,7 @@ export const initialRisks: Risk[] = [
     department: 'Engineering',
     createdAt: new Date(2024, 10, 15).toISOString(),
     updatedAt: new Date(2024, 10, 15).toISOString(),
+    rejectionReason: null,
   },
   {
     id: 'r1',
@@ -45,6 +46,7 @@ export const initialRisks: Risk[] = [
     department: 'Engineering',
     createdAt: new Date(2023, 10, 15).toISOString(),
     updatedAt: new Date(2023, 10, 15).toISOString(),
+    rejectionReason: null,
   },
   {
     id: 'r2',
@@ -61,6 +63,7 @@ export const initialRisks: Risk[] = [
     department: 'Engineering',
     createdAt: new Date(2023, 9, 20).toISOString(),
     updatedAt: new Date(2023, 11, 1).toISOString(),
+    rejectionReason: null,
   },
   {
     id: 'r3',
@@ -77,6 +80,7 @@ export const initialRisks: Risk[] = [
     department: 'Marketing',
     createdAt: new Date(2023, 11, 5).toISOString(),
     updatedAt: new Date(2023, 11, 5).toISOString(),
+    rejectionReason: null,
   },
   {
     id: 'r4',
@@ -93,5 +97,6 @@ export const initialRisks: Risk[] = [
     department: 'HR',
     createdAt: new Date(2023, 8, 1).toISOString(),
     updatedAt: new Date(2023, 10, 10).toISOString(),
+    rejectionReason: null,
   },
 ];
