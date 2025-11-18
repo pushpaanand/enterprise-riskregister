@@ -35,7 +35,6 @@ export interface User {
 export interface Risk {
   id: string;
   riskNo?: string; // e.g., R001 (unique per department)
-  name: string;
   description: string;
   category?: string;
   subcategory?: string;

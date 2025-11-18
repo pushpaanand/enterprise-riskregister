@@ -13,7 +13,6 @@ interface RiskFormModalProps {
 // Removed AI generation
 
 const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, riskToEdit, owners }) => {
-  const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [impact, setImpact] = useState<RiskImpact>('Moderate');
   const [likelihood, setLikelihood] = useState<RiskLikelihood>('Possible');
@@ -28,7 +27,6 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
 
   useEffect(() => {
     if (riskToEdit) {
-      setName(riskToEdit.name);
       setDescription(riskToEdit.description);
       setImpact(riskToEdit.impact);
       setLikelihood(riskToEdit.likelihood);
@@ -41,7 +39,6 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       setPlanOfAction(riskToEdit.planOfAction || '');
     } else {
       // Reset form when opening for a new risk
-      setName('');
       setDescription('');
       setImpact('Moderate');
       setLikelihood('Possible');
@@ -61,7 +58,6 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
     e.preventDefault();
     onSave({
       id: riskToEdit?.id,
-      name: name || (description.trim().split('\n')[0].slice(0, 80) || 'Risk'),
       description,
       category,
       // subcategory removed from form

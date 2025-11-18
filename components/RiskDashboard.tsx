@@ -46,7 +46,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [historyRiskId, setHistoryRiskId] = useState<string | null>(null);
   const [isRiskChangeOpen, setIsRiskChangeOpen] = useState(false);
   const [riskChangeId, setRiskChangeId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'risks' | 'new' | 'incidents'>('risks');
+  const [activeTab, setActiveTab] = useState<'risks' | 'new' | 'incidents' | 'pending' | 'rejected'>('risks');
   const [incidentRiskId, setIncidentRiskId] = useState<string | undefined>(undefined);
   const [editingIncident, setEditingIncident] = useState<Incident | null>(null);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -65,6 +65,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [newRiskPage, setNewRiskPage] = useState<number>(1);
   const [incPage, setIncPage] = useState<number>(1);
   const [incPageSize, setIncPageSize] = useState<number>(10);
+  const [pendingPage, setPendingPage] = useState<number>(1);
+  const [rejectedPage, setRejectedPage] = useState<number>(1);
   const [rejectTarget, setRejectTarget] = useState<Risk | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
   
@@ -157,7 +159,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               {showSummary ? 'Hide Summary' : 'Show Summary'}
             </button>
           )}
-          {(activeTab === 'risks') && (currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+          {activeTab !== 'incidents' && (currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
             <button
               type="button"
               onClick={() => setShowMatrix(m => !m)}
@@ -172,23 +174,22 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => setActiveTab('risks')} className={`px-3 py-1.5 text-sm rounded-md border ${activeTab==='risks'?'bg-brand-primary text-white border-brand-primary':'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300'}`}>Risks</button>
           <button onClick={() => setActiveTab('new')} className={`px-3 py-1.5 text-sm rounded-md border ${activeTab==='new'?'bg-brand-primary text-white border-brand-primary':'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300'}`}>New Risks</button>
+          <button onClick={() => setActiveTab('pending')} className={`px-3 py-1.5 text-sm rounded-md border relative ${activeTab==='pending'?'bg-brand-primary text-white border-brand-primary':'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300'}`}>
+            Pending Action
+            {(() => {
+              const pendingCount = risks.filter(r => r.status === 'Raised').length;
+              if (pendingCount > 0) {
+                return (
+                  <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                    {pendingCount}
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </button>
+          <button onClick={() => setActiveTab('rejected')} className={`px-3 py-1.5 text-sm rounded-md border ${activeTab==='rejected'?'bg-brand-primary text-white border-brand-primary':'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300'}`}>Rejected Risks</button>
           <button onClick={() => setActiveTab('incidents')} className={`px-3 py-1.5 text-sm rounded-md border ${activeTab==='incidents'?'bg-brand-primary text-white border-brand-primary':'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300'}`}>Incidents</button>
-          {currentUser?.role === 'admin' && (
-            <>
-              <label className="ml-2 text-sm text-base-content dark:text-dark-content">
-                Department
-                <select
-                  value={adminDept}
-                  onChange={(e) => onChangeAdminDept && onChangeAdminDept(e.target.value)}
-                  className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
-                >
-                  {(adminDeptOptions.length ? adminDeptOptions : ['All']).map(opt => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
         </div>
       </div>
 
@@ -220,8 +221,25 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       </dl>
 
       {activeTab !== 'incidents' && showSummary && (
-        <div className="mt-8 bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content">AI-Powered Summary</h3>
+        <>
+          {currentUser?.role === 'admin' && (
+            <div className="mt-8 flex items-center gap-3">
+              <label className="text-sm text-base-content dark:text-dark-content">
+                Department
+                <select
+                  value={adminDept}
+                  onChange={(e) => onChangeAdminDept && onChangeAdminDept(e.target.value)}
+                  className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
+                >
+                  {(adminDeptOptions.length ? adminDeptOptions : ['All']).map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          <div className="mt-8 bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content">AI-Powered Summary</h3>
           <div className="mt-2 text-sm text-base-content-muted dark:text-dark-content-muted">
               {summary ? <pre className="whitespace-pre-wrap">{summary}</pre> : <p>Click the button to generate an executive summary of the current risks.</p>}
               {isGeneratingSummary && <p className="animate-pulse">Generating summary...</p>}
@@ -248,10 +266,11 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                   {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
               </button>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
-      {(activeTab === 'risks') && showMatrix && (currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+      {activeTab !== 'incidents' && showMatrix && (currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
         <div className="mt-8 bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
           <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content">Risk Matrix</h3>
           <p className="mt-2 text-sm text-base-content-muted dark:text-dark-content-muted">Counts by Impact × Likelihood</p>
@@ -276,7 +295,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
               >
-                {['All','Raised','Rejected','New','Existing','Downgraded','Upgraded','Eliminated','Open','Closed','In Progress'].map(opt => (
+                {['All','Raised','New','Existing','Downgraded','Upgraded','Eliminated','Open','Closed','In Progress'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
@@ -295,8 +314,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           </div>
           {(() => {
-            // Apply admin-level dept filter first
-            let base = risks;
+            // Apply admin-level dept filter first, and exclude rejected risks
+            let base = risks.filter(r => r.status !== 'Rejected');
             if (currentUser?.role === 'admin') {
               if (adminDept && adminDept !== 'All') base = base.filter(r => String(r.department || '') === adminDept);
             }
@@ -310,21 +329,21 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <>
                 <RiskTable
                   risks={pageItems}
-                  owners={owners}
-                  users={users}
-                  currentUser={currentUser}
-                  onEdit={openEditModal}
-                  onDelete={onDeleteRisk}
-                  onApprove={onApproveRisk}
+            owners={owners}
+            users={users}
+            currentUser={currentUser}
+            onEdit={openEditModal}
+            onDelete={onDeleteRisk}
+            onApprove={onApproveRisk}
                   onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
-                  onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
-                  incidentCounts={(() => {
-                    const counts: Record<string, number> = {};
-                    (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
-                    return counts;
-                  })()}
-                  onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
-                  onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
+            onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+            incidentCounts={(() => {
+              const counts: Record<string, number> = {};
+              (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
+              return counts;
+            })()}
+            onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
+            onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
                 />
                 <div className="mt-3 flex items-center justify-end gap-3 text-sm">
                   <label className="flex items-center gap-1 text-base-content-muted dark:text-dark-content-muted">
@@ -364,8 +383,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           </div>
           {(() => {
-            // Show both newly created and rejected risks in this queue
-            let base = risks.filter(r => r.status === 'New' || r.status === 'Rejected');
+            // Show only newly created risks (exclude rejected)
+            let base = risks.filter(r => r.status === 'New');
             if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
               base = base.filter(r => String(r.department || '') === adminDept);
             }
@@ -375,6 +394,77 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             const pageItems = filtered.slice(start, start + riskPageSize);
             const totalPages = Math.max(1, Math.ceil(total / riskPageSize));
             if (newRiskPage > totalPages) setNewRiskPage(totalPages);
+            return (
+              <>
+                <RiskTable
+                  risks={pageItems}
+            owners={owners}
+            users={users}
+            currentUser={currentUser}
+            onEdit={openEditModal}
+            onDelete={onDeleteRisk}
+            onApprove={onApproveRisk}
+                  onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
+            onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+            incidentCounts={(() => {
+              const counts: Record<string, number> = {};
+              (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
+              return counts;
+            })()}
+            onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
+            onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
+                />
+                <div className="mt-3 flex items-center justify-end gap-3 text-sm">
+                  <label className="flex items-center gap-1 text-base-content-muted dark:text-dark-content-muted">
+                    Rows per page
+                    <select
+                      value={riskPageSize}
+                      onChange={(e) => { setRiskPageSize(Number(e.target.value)); setNewRiskPage(1); }}
+                      className="ml-1 rounded border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1"
+                    >
+                      {[5,10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <span className="text-base-content-muted dark:text-dark-content-muted">Page {newRiskPage} of {totalPages}</span>
+                  <button disabled={newRiskPage<=1} onClick={() => setNewRiskPage(p => Math.max(1, p-1))} className="px-2 py-1 rounded border disabled:opacity-50">Prev</button>
+                  <button disabled={newRiskPage>=totalPages} onClick={() => setNewRiskPage(p => Math.min(totalPages, p+1))} className="px-2 py-1 rounded border disabled:opacity-50">Next</button>
+                </div>
+              </>
+            );
+          })()}
+          <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">
+            Showing risks with Status = New.
+          </div>
+        </div>
+      ) : activeTab === 'pending' ? (
+        <div className="mt-8">
+          {/* Filters for pending actions */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
+              <select
+                value={identificationFilter}
+                onChange={(e) => setIdentificationFilter(e.target.value)}
+                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+              >
+                {['All','Inherent risk','Residual risk'].map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {(() => {
+            // Show only risks with status 'Raised' waiting for approval/rejection
+            let base = risks.filter(r => r.status === 'Raised');
+            if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
+              base = base.filter(r => String(r.department || '') === adminDept);
+            }
+            const filtered = base.filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter));
+            const total = filtered.length;
+            const start = (pendingPage - 1) * riskPageSize;
+            const pageItems = filtered.slice(start, start + riskPageSize);
+            const totalPages = Math.max(1, Math.ceil(total / riskPageSize));
+            if (pendingPage > totalPages) setPendingPage(totalPages);
             return (
               <>
                 <RiskTable
@@ -400,22 +490,93 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                     Rows per page
                     <select
                       value={riskPageSize}
-                      onChange={(e) => { setRiskPageSize(Number(e.target.value)); setNewRiskPage(1); }}
+                      onChange={(e) => { setRiskPageSize(Number(e.target.value)); setPendingPage(1); }}
                       className="ml-1 rounded border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1"
                     >
                       {[5,10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </label>
-                  <span className="text-base-content-muted dark:text-dark-content-muted">Page {newRiskPage} of {totalPages}</span>
-                  <button disabled={newRiskPage<=1} onClick={() => setNewRiskPage(p => Math.max(1, p-1))} className="px-2 py-1 rounded border disabled:opacity-50">Prev</button>
-                  <button disabled={newRiskPage>=totalPages} onClick={() => setNewRiskPage(p => Math.min(totalPages, p+1))} className="px-2 py-1 rounded border disabled:opacity-50">Next</button>
+                  <span className="text-base-content-muted dark:text-dark-content-muted">Page {pendingPage} of {totalPages}</span>
+                  <button disabled={pendingPage<=1} onClick={() => setPendingPage(p => Math.max(1, p-1))} className="px-2 py-1 rounded border disabled:opacity-50">Prev</button>
+                  <button disabled={pendingPage>=totalPages} onClick={() => setPendingPage(p => Math.min(totalPages, p+1))} className="px-2 py-1 rounded border disabled:opacity-50">Next</button>
+                </div>
+                <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">
+                  Showing risks with Status = Raised. Managers can approve or reject these risks.
                 </div>
               </>
             );
           })()}
-          <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">
-            Showing risks with Status = New or Rejected.
+        </div>
+      ) : activeTab === 'rejected' ? (
+        <div className="mt-8">
+          {/* Filters for rejected risks */}
+          <div className="mb-3 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
+              <select
+                value={identificationFilter}
+                onChange={(e) => setIdentificationFilter(e.target.value)}
+                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+              >
+                {['All','Inherent risk','Residual risk'].map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </div>
           </div>
+          {(() => {
+            // Show only risks with status 'Rejected' along with their rejection reasons
+            let base = risks.filter(r => r.status === 'Rejected');
+            if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
+              base = base.filter(r => String(r.department || '') === adminDept);
+            }
+            const filtered = base.filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter));
+            const total = filtered.length;
+            const start = (rejectedPage - 1) * riskPageSize;
+            const pageItems = filtered.slice(start, start + riskPageSize);
+            const totalPages = Math.max(1, Math.ceil(total / riskPageSize));
+            if (rejectedPage > totalPages) setRejectedPage(totalPages);
+            return (
+              <>
+                <RiskTable
+                  risks={pageItems}
+                  owners={owners}
+                  users={users}
+                  currentUser={currentUser}
+                  onEdit={openEditModal}
+                  onDelete={onDeleteRisk}
+                  onApprove={onApproveRisk}
+                  onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
+                  onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+                  incidentCounts={(() => {
+                    const counts: Record<string, number> = {};
+                    (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
+                    return counts;
+                  })()}
+                  onViewIncidents={(risk) => { setHistoryRiskId(risk.id); setIsRiskHistoryOpen(true); }}
+                  onViewRiskHistory={(risk) => { setRiskChangeId(risk.id); setIsRiskChangeOpen(true); }}
+                />
+                <div className="mt-3 flex items-center justify-end gap-3 text-sm">
+                  <label className="flex items-center gap-1 text-base-content-muted dark:text-dark-content-muted">
+                    Rows per page
+                    <select
+                      value={riskPageSize}
+                      onChange={(e) => { setRiskPageSize(Number(e.target.value)); setRejectedPage(1); }}
+                      className="ml-1 rounded border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1"
+                    >
+                      {[5,10,20,50].map(n => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </label>
+                  <span className="text-base-content-muted dark:text-dark-content-muted">Page {rejectedPage} of {totalPages}</span>
+                  <button disabled={rejectedPage<=1} onClick={() => setRejectedPage(p => Math.max(1, p-1))} className="px-2 py-1 rounded border disabled:opacity-50">Prev</button>
+                  <button disabled={rejectedPage>=totalPages} onClick={() => setRejectedPage(p => Math.min(totalPages, p+1))} className="px-2 py-1 rounded border disabled:opacity-50">Next</button>
+                </div>
+                <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">
+                  Showing all rejected risks with their rejection reasons.
+                </div>
+              </>
+            );
+          })()}
         </div>
       ) : (
         <div className="mt-8 space-y-6">

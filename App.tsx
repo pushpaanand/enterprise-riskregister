@@ -131,7 +131,6 @@ const App: React.FC = () => {
                             const mapped = data.map((r: any) => ({
                             id: r.RiskId || r.id,
                             riskNo: r.RiskNo || r.riskNo,
-                            name: r.Name || r.name,
                             description: r.Description || r.description,
                             impact: r.Impact || r.impact,
                             likelihood: r.Likelihood || r.likelihood,
@@ -441,7 +440,6 @@ const App: React.FC = () => {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: riskData.name,
                         description: riskData.description,
                         impact: riskData.impact,
                         likelihood: riskData.likelihood,
@@ -496,7 +494,6 @@ const App: React.FC = () => {
                 departmentId: undefined, // resolved server-side by createdByUserId
                 riskNo: undefined,       // auto-generated server-side
                 departmentName: department,
-                name: riskData.name,
                 description: riskData.description,
                 impact: riskData.impact,
                 likelihood: riskData.likelihood,
@@ -522,7 +519,6 @@ const App: React.FC = () => {
                     const mapped: Risk = {
                         id: r.RiskId,
                         riskNo: r.RiskNo,
-                        name: r.Name,
                         description: r.Description,
                         category: undefined,
                         subcategory: undefined,
@@ -888,7 +884,6 @@ const App: React.FC = () => {
                             onDeleteRisk={handleDeleteRisk}
                             onApproveRisk={(risk) => handleSaveRisk({
                                 id: risk.id,
-                                name: risk.name,
                                 description: risk.description,
                                 category: risk.category,
                                 subcategory: risk.subcategory,
@@ -905,7 +900,6 @@ const App: React.FC = () => {
                             })}
                             onRejectRisk={(risk, reason) => handleSaveRisk({
                                 id: risk.id,
-                                name: risk.name,
                                 description: risk.description,
                                 category: risk.category,
                                 subcategory: risk.subcategory,
@@ -1049,7 +1043,6 @@ const App: React.FC = () => {
                                     onDeleteRisk={handleDeleteRisk}
                                     onApproveRisk={(risk) => handleSaveRisk({
                                         id: risk.id,
-                                        name: risk.name,
                                         description: risk.description,
                                         category: risk.category,
                                         subcategory: risk.subcategory,
@@ -1066,7 +1059,6 @@ const App: React.FC = () => {
                                     })}
                                     onRejectRisk={(risk, reason) => handleSaveRisk({
                                         id: risk.id,
-                                        name: risk.name,
                                         description: risk.description,
                                         category: risk.category,
                                         subcategory: risk.subcategory,
@@ -1248,7 +1240,6 @@ const App: React.FC = () => {
                         onDeleteRisk={handleDeleteRisk}
                                 onApproveRisk={(risk) => handleSaveRisk({
                                     id: risk.id,
-                                    name: risk.name,
                                     description: risk.description,
                                     category: risk.category,
                                     subcategory: risk.subcategory,
@@ -1265,7 +1256,6 @@ const App: React.FC = () => {
                                 })}
                                 onRejectRisk={(risk, reason) => handleSaveRisk({
                                     id: risk.id,
-                                    name: risk.name,
                                     description: risk.description,
                                     category: risk.category,
                                     subcategory: risk.subcategory,

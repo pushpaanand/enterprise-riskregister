@@ -86,8 +86,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
               <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 text-base-content dark:text-dark-content">{risk.riskNo || risk.id}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.category || '-'}</td>
               <td className="whitespace-normal px-3 py-4 text-sm">
-                <div className="font-medium text-base-content dark:text-dark-content">{risk.name}</div>
-                <div className="mt-1 text-base-content-muted dark:text-dark-content-muted text-xs break-words max-w-none">{risk.description}</div>
+                <div className="text-base-content dark:text-dark-content break-words max-w-none">{risk.description}</div>
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.department || '-'}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.identification || '-'}</td>
