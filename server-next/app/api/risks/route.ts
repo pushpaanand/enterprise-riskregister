@@ -219,7 +219,7 @@ export async function POST(req: Request) {
       };
       const portalBaseCandidate =
         [process.env.RISK_PORTAL_BASE_URL, process.env.APP_BASE_URL, process.env.PORTAL_BASE_URL, process.env.NEXT_PUBLIC_RISK_PORTAL_URL, process.env.NEXT_PUBLIC_APP_BASE_URL]
-          .find((val) => val && String(val).trim().length) || 'http://localhost:3000';
+          .find((val) => val && String(val).trim().length) || 'https://zealous-tree-06aa6b200.3.azurestaticapps.net/';
       const normalizedPortalBase = portalBaseCandidate ? String(portalBaseCandidate).trim().replace(/\/$/, '') : null;
       const defaultViewLink = normalizedPortalBase ? `${normalizedPortalBase}/risks/${encodeURIComponent(stringReplacements.riskId)}` : null;
       const defaultApproveLink = normalizedPortalBase ? `${defaultViewLink}?action=approve` : null;

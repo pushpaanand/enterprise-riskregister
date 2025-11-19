@@ -1195,7 +1195,7 @@ const App: React.FC = () => {
                                         try {
                                             const dept = currentUser.department || 'All';
                                             setAiLoading(true);
-                                            const res = await fetch('http://localhost:4000/api/ai/summary', {
+                                            const res = await fetch('https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.net/api/ai/summary', {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({
