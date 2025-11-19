@@ -1,6 +1,6 @@
 /* Global watermark applied to every page */
 :root {
-	--watermark-image: url('/assets/images/logo.png');
+	--watermark-image: url('/components/assets/logo.png');
 }
 
 /* Place a faint centered watermark overlay above content (non-interactive) */

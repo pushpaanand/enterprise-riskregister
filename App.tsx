@@ -776,7 +776,7 @@ const App: React.FC = () => {
                     <div className="flex h-16 items-center justify-between">
                          <div className="flex items-center gap-3">
                              <img
-                               src="/assets/images/logo.png"
+                               src="/components/assets/logo.png"
                                alt="Kauvery Logo"
                                className="h-12 sm:h-14 w-auto object-contain select-none"
                                style={{ imageRendering: 'auto' }}
