@@ -1,0 +1,4 @@
+# This folder contains static image assets
+# Place logo.png and kauvery_logo.png here
+# They will be served at /components/assets/ in production
+
