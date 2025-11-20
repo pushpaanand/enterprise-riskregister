@@ -44,6 +44,8 @@ export interface Risk {
   identification?: 'Inherent risk' | 'Residual risk';
   /** Optional plan of action for the risk */
   planOfAction?: string;
+  /** Risk indicator */
+  riskIndicator?: string;
   /** Business classification status independent from lifecycle status */
   classificationStatus?: 'Existing' | 'New' | 'Downgraded' | 'Upgraded' | 'Eliminated';
   impact: RiskImpact;

@@ -23,6 +23,7 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
   const [existingControl, setExistingControl] = useState<string>('');
   const [identification, setIdentification] = useState<'Inherent risk' | 'Residual risk'>('Inherent risk');
   const [planOfAction, setPlanOfAction] = useState<string>('');
+  const [riskIndicator, setRiskIndicator] = useState<string>('');
   // classification status removed per request; keep lifecycle status only
 
   useEffect(() => {
@@ -37,6 +38,7 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       setCategory(riskToEdit.category || '');
       setSubcategory(riskToEdit.subcategory || '');
       setPlanOfAction(riskToEdit.planOfAction || '');
+      setRiskIndicator(riskToEdit.riskIndicator || '');
     } else {
       // Reset form when opening for a new risk
       setDescription('');
@@ -49,6 +51,7 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       setIdentification('Inherent risk');
       setOwnerId(owners[0]?.id || '');
       setPlanOfAction('');
+      setRiskIndicator('');
     }
   }, [riskToEdit, isOpen, owners]);
   
@@ -64,6 +67,7 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       existingControlInPlace: existingControl,
       identification,
       planOfAction,
+      riskIndicator,
       impact,
       likelihood,
       status,
@@ -99,6 +103,13 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
           <label htmlFor="category" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Category</label>
           <div className="mt-2">
             <input id="category" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g., Security" className={inputStyles} />
+          </div>
+        </div>
+
+        <div>
+          <label htmlFor="risk-indicator" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Risk Indicator</label>
+          <div className="mt-2">
+            <input id="risk-indicator" value={riskIndicator} onChange={(e) => setRiskIndicator(e.target.value)} placeholder="Enter risk indicator" className={inputStyles} />
           </div>
         </div>
 

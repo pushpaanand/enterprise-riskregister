@@ -52,7 +52,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
     return getOwnerName(risk.ownerId);
   };
 
-  const baseColumns = 11; // added Department + Incidents column
+  const baseColumns = 12; // Risk ID, Category, Description, Department, Identification, Existing Control, Plan of Action, Risk Indicator, Impact, Likelihood, Stage, Raised By, History, Last Updated
   const userHasRowActions = currentUser?.role === 'user' && risks.some(r => r.createdByUserId === currentUser?.id);
   const showActions = Boolean(currentUser?.role === 'manager' || userHasRowActions);
   const totalColumns = showActions ? baseColumns + 1 : baseColumns;
@@ -75,6 +75,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Raised By</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">History</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Last Updated</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Risk Indicator</th>
             {showActions && (
                 <th scope="col" className="py-3.5 pl-3 pr-4 text-left text-sm font-semibold text-brand-primary sm:pr-6 w-40">Actions</th>
             )}
@@ -134,6 +135,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
                 </div>
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content-muted dark:text-dark-content-muted">{new Date(risk.updatedAt).toLocaleDateString()}</td>
+              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.riskIndicator || '-'}</td>
               {showActions && (
                 <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 w-40" onClick={(e) => e.stopPropagation()}>
                   {currentUser?.role === 'manager' && (

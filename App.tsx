@@ -121,7 +121,15 @@ const App: React.FC = () => {
             // Load risks from API and scope by role/department
             (async () => {
                 try {
-                    const res = await fetch(apiUrl('/risks'));
+                    // Pass user info to API for server-side filtering
+                    const userId = currentUser?.id || '';
+                    const userRole = currentUser?.role || '';
+                    const queryParams = new URLSearchParams();
+                    if (userId) queryParams.set('userId', userId);
+                    if (userRole) queryParams.set('role', userRole);
+                    const queryString = queryParams.toString();
+                    const apiPath = `/risks${queryString ? `?${queryString}` : ''}`;
+                    const res = await fetch(apiUrl(apiPath));
                     const data = await res.json();
                     // Debug: log API response for verification
                     // eslint-disable-next-line no-console
@@ -145,6 +153,7 @@ const App: React.FC = () => {
                             existingControlInPlace: r.ExistingControlInPlace || r.existingControlInPlace || '',
                                 identification: r.Identification || r.identification || undefined,
                             planOfAction: r.PlanOfAction || r.planOfAction || '',
+                            riskIndicator: r.RiskIndicator || r.riskIndicator || undefined,
                         rejectionReason: r.RejectionReason || r.rejectionReason || null,
                             classificationStatus: r.ClassificationStatus || r.classificationStatus || undefined,
                             department: r.Department || r.department || undefined,
@@ -444,12 +453,13 @@ const App: React.FC = () => {
                         impact: riskData.impact,
                         likelihood: riskData.likelihood,
                         status: riskData.status,
+                        category: (riskData as any).category,
                         identification: (riskData as any).identification,
                         existingControlInPlace: (riskData as any).existingControlInPlace,
                         planOfAction: (riskData as any).planOfAction,
+                        riskIndicator: (riskData as any).riskIndicator,
                         rejectionReason: (riskData as any).rejectionReason ?? null,
                         changedByUserId: currentUser?.id,
-                        // categoryId: optional mapping if you have ids; skipping here
                     })
                 });
             } catch (e) {
@@ -501,10 +511,11 @@ const App: React.FC = () => {
                 status: currentUser?.role === 'user' ? 'Raised' : riskData.status,
                 ownerId: riskData.ownerId,
                 createdByUserId: currentUser?.id,
-                categoryId: undefined,
+                category: (riskData as any).category,
                 identification: (riskData as any).identification,
                 existingControlInPlace: (riskData as any).existingControlInPlace,
                 planOfAction: (riskData as any).planOfAction,
+                riskIndicator: (riskData as any).riskIndicator,
                 rejectionReason: (riskData as any).rejectionReason ?? null,
             };
             try {
@@ -525,6 +536,7 @@ const App: React.FC = () => {
                         existingControlInPlace: r.ExistingControlInPlace || '',
                         identification: r.Identification || undefined,
                         planOfAction: r.PlanOfAction || '',
+                        riskIndicator: r.RiskIndicator || undefined,
                         impact: r.Impact,
                         likelihood: r.Likelihood,
                         status: r.Status,
@@ -896,6 +908,7 @@ const App: React.FC = () => {
                                 identification: risk.identification,
                                 existingControlInPlace: risk.existingControlInPlace,
                                 planOfAction: risk.planOfAction,
+                                riskIndicator: risk.riskIndicator,
                                 rejectionReason: null,
                             })}
                             onRejectRisk={(risk, reason) => handleSaveRisk({
@@ -912,6 +925,7 @@ const App: React.FC = () => {
                                 identification: risk.identification,
                                 existingControlInPlace: risk.existingControlInPlace,
                                 planOfAction: risk.planOfAction,
+                                riskIndicator: risk.riskIndicator,
                                 rejectionReason: reason,
                             })}
                             incidents={incidents.filter(i => risks.some(r => r.id === i.riskId))}
@@ -1055,6 +1069,7 @@ const App: React.FC = () => {
                                         identification: risk.identification,
                                         existingControlInPlace: risk.existingControlInPlace,
                                         planOfAction: risk.planOfAction,
+                                        riskIndicator: risk.riskIndicator,
                                         rejectionReason: null,
                                     })}
                                     onRejectRisk={(risk, reason) => handleSaveRisk({
@@ -1071,6 +1086,7 @@ const App: React.FC = () => {
                                         identification: risk.identification,
                                         existingControlInPlace: risk.existingControlInPlace,
                                         planOfAction: risk.planOfAction,
+                                        riskIndicator: risk.riskIndicator,
                                         rejectionReason: reason,
                                     })}
                                     /* restrict incidents to manager's dept risks */
@@ -1252,6 +1268,7 @@ const App: React.FC = () => {
                                     identification: risk.identification,
                                     existingControlInPlace: risk.existingControlInPlace,
                                     planOfAction: risk.planOfAction,
+                                    riskIndicator: risk.riskIndicator,
                                     rejectionReason: null,
                                 })}
                                 onRejectRisk={(risk, reason) => handleSaveRisk({
@@ -1268,6 +1285,7 @@ const App: React.FC = () => {
                                     identification: risk.identification,
                                     existingControlInPlace: risk.existingControlInPlace,
                                     planOfAction: risk.planOfAction,
+                                    riskIndicator: risk.riskIndicator,
                                     rejectionReason: reason,
                                 })}
                                 incidents={incidents}

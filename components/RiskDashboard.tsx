@@ -295,7 +295,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
               >
-                {['All','Raised','New','Existing','Downgraded','Upgraded','Eliminated','Open','Closed','In Progress'].map(opt => (
+                {['All','New','Existing','Downgraded','Upgraded','Eliminated','Open','Closed','In Progress'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
@@ -314,8 +314,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           </div>
           {(() => {
-            // Apply admin-level dept filter first, and exclude rejected risks
-            let base = risks.filter(r => r.status !== 'Rejected');
+            // Apply admin-level dept filter first, and exclude rejected and raised risks (raised risks are shown in Pending Action tab)
+            let base = risks.filter(r => r.status !== 'Rejected' && r.status !== 'Raised');
             if (currentUser?.role === 'admin') {
               if (adminDept && adminDept !== 'All') base = base.filter(r => String(r.department || '') === adminDept);
             }
