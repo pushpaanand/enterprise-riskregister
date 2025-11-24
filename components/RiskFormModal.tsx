@@ -76,10 +76,8 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
     onClose();
   };
 
-
   const inputStyles = "block w-full rounded-md border-0 bg-base-100 dark:bg-dark-100 py-2.5 px-3 text-base-content dark:text-dark-content ring-1 ring-inset ring-base-300 dark:ring-dark-300 placeholder:text-base-content-muted dark:placeholder:dark-content-muted focus:ring-2 focus:ring-inset focus:ring-brand-primary sm:text-sm sm:leading-6";
   const selectStyles = "block w-full rounded-md border-0 bg-base-100 dark:bg-dark-100 py-2.5 pl-3 pr-10 text-base-content dark:text-dark-content ring-1 ring-inset ring-base-300 dark:ring-dark-300 focus:ring-2 focus:ring-inset focus:ring-brand-primary sm:text-sm sm:leading-6";
-
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={riskToEdit ? 'Edit Risk' : 'Add New Risk'}>

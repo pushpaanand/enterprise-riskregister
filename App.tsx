@@ -99,9 +99,10 @@ const App: React.FC = () => {
      
     useEffect(() => {
         localStorage.setItem('users', JSON.stringify(users));
-        // If current user is deleted, default to first user
+        // If current user is deleted, log them out
         if (currentUser && !users.find(u => u.id === currentUser.id)) {
-            handleUserChange(users[0]?.id || '');
+            setCurrentUser(null);
+            localStorage.removeItem('currentUserId');
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [users]);
@@ -307,10 +308,7 @@ const App: React.FC = () => {
         }
     }, []);
 
-    const handleUserChange = (userId: string) => {
-        const user = users.find(u => u.id === userId);
-        setCurrentUser(user || null);
-    };
+    // User switching removed - users can only see their own account
 
     const handleLoggedIn = (user: User) => {
         // Sync users from localStorage (in case login created a new user)
@@ -435,10 +433,25 @@ const App: React.FC = () => {
     }, [pendingLinkAction, currentUser]);
 
     const handleLogout = () => {
-        localStorage.removeItem('currentUserId');
-        setCurrentUser(null);
-        setAdminView('risks');
-        setManagerView('risks');
+        // localStorage.removeItem('currentUserId');
+        // setCurrentUser(null);
+        // setAdminView('risks');
+        // setManagerView('risks');
+        // Check if user is logged in via Azure AD
+        const azureUser = localStorage.getItem('azureUser');
+        
+        if (azureUser) {
+            // Azure AD logout - redirect to Azure Static Web Apps logout endpoint
+            const homePageUrl = window.location.origin;
+            window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}`;
+        } else {
+            // Regular logout - clear local storage and state
+            localStorage.removeItem('currentUserId');
+            localStorage.removeItem('azureUser');
+            setCurrentUser(null);
+            setAdminView('risks');
+            setManagerView('risks');
+        }
     };
 
     // Risk CRUD
@@ -479,11 +492,65 @@ const App: React.FC = () => {
                 (deptFromUser && deptFromUser.trim()) ||
                 'General';
 
-            // Compute next risk number for this department (e.g., O001, M002)
-            const derivePrefix = (name: string | undefined | null) => {
-                if (!name) return 'R';
-                const match = name.trim().toUpperCase().match(/[A-Z]/);
-                return match ? match[0] : 'R';
+            // Compute next risk number for this department (e.g., OP001, CL002)
+            const derivePrefix = (name: string | undefined | null): string => {
+                if (!name) return 'RS'; // Default prefix with 2 letters
+                const normalized = String(name).trim();
+                
+                // Specific department mappings
+                const departmentPrefixMap: Record<string, string> = {
+                    'clinical': 'CL',
+                    'information security': 'IT',
+                    'information technology': 'IT',
+                    'informationtechnology': 'IT',
+                    'info sec': 'IT',
+                    'infosec': 'IT',
+                    'it': 'IT',
+                    'hr': 'HR',
+                    'human resources': 'HR',
+                    'humanresource': 'HR',
+                    'insurance': 'IN',
+                    'operations': 'OP',
+                    'operation': 'OP',
+                    'facilities': 'FC',
+                    'facility': 'FC',
+                };
+                
+                // Normalize input: remove extra spaces and convert to lowercase
+                const lowerInput = normalized.toLowerCase().replace(/\s+/g, ' ').trim();
+                
+                // Check for exact matches (case-insensitive)
+                if (departmentPrefixMap[lowerInput]) {
+                    return departmentPrefixMap[lowerInput];
+                }
+                
+                // Check for partial matches (e.g., "Clinical Department" contains "clinical")
+                // Also check without spaces for variations like "InformationSecurity"
+                const inputWithoutSpaces = lowerInput.replace(/\s+/g, '');
+                for (const [key, prefix] of Object.entries(departmentPrefixMap)) {
+                    const keyWithoutSpaces = key.replace(/\s+/g, '');
+                    if (lowerInput.includes(key) || inputWithoutSpaces.includes(keyWithoutSpaces)) {
+                        return prefix;
+                    }
+                }
+                
+                // Default: use first two alphabetic characters
+                const match = normalized.toUpperCase().match(/[A-Z]{2}/);
+                if (match) {
+                    return match[0];
+                }
+                
+                // Fallback: use first letter + next available letter or 'R'
+                const firstLetter = normalized.toUpperCase().match(/[A-Z]/);
+                const secondLetter = normalized.slice(1).toUpperCase().match(/[A-Z]/);
+                if (firstLetter && secondLetter) {
+                    return firstLetter[0] + secondLetter[0];
+                }
+                if (firstLetter) {
+                    return firstLetter[0] + 'R';
+                }
+                
+                return 'RS'; // Final fallback
             };
             const normalizedDept = (department || '').trim().toLowerCase();
             const prefix = derivePrefix(department);
@@ -491,8 +558,9 @@ const App: React.FC = () => {
                 .filter(r => (r.department || '').trim().toLowerCase() === normalizedDept)
                 .map(r => {
                     const riskNoValue = (r.riskNo || '').toString().trim().toUpperCase();
-                    if (!riskNoValue.startsWith(prefix) || riskNoValue.length < 2) return 0;
-                    const numericPart = riskNoValue.substring(1);
+                    // For 2-letter prefix, extract numeric part starting from position 3 (e.g., "OP001" -> "001")
+                    if (!riskNoValue.startsWith(prefix) || riskNoValue.length < 5) return 0;
+                    const numericPart = riskNoValue.substring(2); // Skip first 2 letters
                     const parsed = parseInt(numericPart, 10);
                     return Number.isNaN(parsed) ? 0 : parsed;
                 })
@@ -785,9 +853,9 @@ const App: React.FC = () => {
     return (
         <div className="bg-base-100 dark:bg-dark-100 min-h-screen font-sans">
             <header className="bg-base-200/80 dark:bg-dark-200/80 backdrop-blur-sm sticky top-0 z-20 border-b border-base-300 dark:border-dark-300">
-                <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="container mx-auto px-1 sm:px-2 lg:px-2">
                     <div className="flex h-16 items-center justify-between">
-                         <div className="flex items-center gap-3">
+                         <div className="flex items-center gap-2 -ml-1 sm:-ml-10">
                              <img
                                src="/components/assets/logo.png"
                                alt="Kauvery Logo"
@@ -858,7 +926,7 @@ const App: React.FC = () => {
                                     </button>
                                 </div>
                             )}
-                            <UserSwitcher users={users} currentUser={currentUser} onUserChange={handleUserChange} />
+                            <UserSwitcher currentUser={currentUser} />
                             {/* <ThemeToggle /> */}
                             {currentUser && (
                                 <button onClick={handleLogout} className="hidden sm:inline-flex px-3 py-1.5 text-sm rounded-md border bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300 hover:bg-base-300 dark:hover:bg-dark-200">
@@ -872,6 +940,7 @@ const App: React.FC = () => {
             <main>
                 {!currentUser ? (
                     <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
+                    // <Login users={users} onLogin={handleLoggedIn} />
                 ) : currentUser.role === 'admin' ? (
                     adminView === 'admin' ? (
                     <AdminDashboard 
