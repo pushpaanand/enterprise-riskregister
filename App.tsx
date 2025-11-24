@@ -433,8 +433,8 @@ const App: React.FC = () => {
     }, [pendingLinkAction, currentUser]);
 
     const handleLogout = () => {
-        // localStorage.removeItem('currentUserId');
-        // setCurrentUser(null);
+        localStorage.removeItem('currentUserId');
+        setCurrentUser(null);
         // setAdminView('risks');
         // setManagerView('risks');
         // Check if user is logged in via Azure AD
