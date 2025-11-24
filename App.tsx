@@ -7,6 +7,7 @@ import AdminDashboard from './components/AdminDashboard';
 import ThemeToggle from './components/ThemeToggle';
 import UserSwitcher from './components/UserSwitcher';
 import Login from './components/Login';
+import AzureStaticWebAppsLogin from './components/AzureStaticWebAppsLogin';
 import { API_BASE_URL, apiUrl } from './api';
 
 type LinkAction = {
@@ -870,7 +871,7 @@ const App: React.FC = () => {
             </header>
             <main>
                 {!currentUser ? (
-                    <Login users={users} onLogin={handleLoggedIn} />
+                    <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
                 ) : currentUser.role === 'admin' ? (
                     adminView === 'admin' ? (
                     <AdminDashboard 
