@@ -433,8 +433,8 @@ const App: React.FC = () => {
     }, [pendingLinkAction, currentUser]);
 
     const handleLogout = () => {
-        localStorage.removeItem('currentUserId');
-        setCurrentUser(null);
+        // localStorage.removeItem('currentUserId');
+        // setCurrentUser(null);
         // setAdminView('risks');
         // setManagerView('risks');
         // Check if user is logged in via Azure AD
@@ -444,6 +444,8 @@ const App: React.FC = () => {
             // Azure AD logout - redirect to Azure Static Web Apps logout endpoint
             const homePageUrl = window.location.origin;
             window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}`;
+            localStorage.removeItem('currentUserId');
+        setCurrentUser(null);
         } else {
             // Regular logout - clear local storage and state
             localStorage.removeItem('currentUserId');
