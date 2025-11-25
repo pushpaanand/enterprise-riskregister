@@ -18,16 +18,17 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [azureUser, setAzureUser] = useState<AzureUser | null>(null);
+  const currentUserId = localStorage.getItem? localStorage.getItem('currentUserId') : '';
 
   // Check if user is already authenticated
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [currentUserId]);
 
   const checkAuth = async () => {
     try {
       // Don't auto-login if currentUserId is not in localStorage (user just logged out)
-      const currentUserId = localStorage.getItem('currentUserId');
+      // const currentUserId = localStorage.getItem('currentUserId');
       if (!currentUserId) {
         // Clear any stale azureUser data
         localStorage.removeItem('azureUser');
