@@ -26,13 +26,28 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
   const checkAuth = async () => {
     try {
+      // Don't auto-login if currentUserId is not in localStorage (user just logged out)
+      const currentUserId = localStorage.getItem('currentUserId');
+      if (!currentUserId) {
+        // Clear any stale azureUser data
+        localStorage.removeItem('azureUser');
+        setLoading(false);
+        return;
+      }
+
       // Azure Static Web Apps provides user info at /.auth/me
       const res = await fetch('/.auth/me');
       if (res.ok) {
         const data = await res.json();
         if (data && data.clientPrincipal) {
-          setAzureUser(data.clientPrincipal);
-          await handleAzureLogin(data.clientPrincipal);
+          // Only proceed if we still have a currentUserId (not logged out)
+          const stillLoggedIn = localStorage.getItem('currentUserId');
+          if (stillLoggedIn) {
+            setAzureUser(data.clientPrincipal);
+            await handleAzureLogin(data.clientPrincipal);
+          } else {
+            setLoading(false);
+          }
         } else {
           setLoading(false);
         }
@@ -144,7 +159,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-md shadow p-6">
         <h1 className="text-2xl font-bold text-base-content dark:text-dark-content mb-6">
-          Sign in to RiskRay
+          Sign in to Kauvery Risk Register
         </h1>
 
         {error && (

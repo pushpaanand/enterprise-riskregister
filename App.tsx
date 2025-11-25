@@ -433,27 +433,26 @@ const App: React.FC = () => {
     }, [pendingLinkAction, currentUser]);
 
     const handleLogout = () => {
-        // localStorage.removeItem('currentUserId');
-        // setCurrentUser(null);
-        // setAdminView('risks');
-        // setManagerView('risks');
         // Check if user is logged in via Azure AD
         const azureUser = localStorage.getItem('azureUser');
         
+        // Clear ALL authentication-related localStorage data BEFORE logout
+        // This prevents auto-login when the page reloads after redirect
+        localStorage.removeItem('currentUserId');
+        localStorage.removeItem('azureUser');
+        
+        // Clear state immediately
+        setCurrentUser(null);
+        setAdminView('risks');
+        setManagerView('risks');
+        
         if (azureUser) {
             // Azure AD logout - redirect to Azure Static Web Apps logout endpoint
+            // This will clear the Azure AD session on the server side
             const homePageUrl = window.location.origin;
             window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}`;
-            localStorage.removeItem('currentUserId');
-        setCurrentUser(null);
-        } else {
-            // Regular logout - clear local storage and state
-            localStorage.removeItem('currentUserId');
-            localStorage.removeItem('azureUser');
-            setCurrentUser(null);
-            setAdminView('risks');
-            setManagerView('risks');
         }
+        // For regular logout, we've already cleared everything above, so no redirect needed
     };
 
     // Risk CRUD
@@ -721,12 +720,47 @@ const App: React.FC = () => {
         }
     };
 
-    const handleRemoveUser = (userId: string) => {
+    const handleRemoveUser = async (userId: string) => {
         if (users.length <= 1) {
             alert("Cannot remove the last user.");
             return;
         }
-        setUsers(users.filter(u => u.id !== userId));
+        
+        // Prevent deleting the currently logged-in user
+        if (currentUser && currentUser.id === userId) {
+            alert("Cannot delete the currently logged-in user. Please log in as a different user first.");
+            return;
+        }
+
+        try {
+            const res = await fetch(apiUrl(`/users/${userId}`), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            
+            const data = await res.json();
+            
+            if (!res.ok) {
+                throw new Error(data?.error || 'Failed to delete user');
+            }
+
+            // Remove from local state
+            setUsers(users.filter(u => u.id !== userId));
+            
+            // Also remove from localStorage users array
+            const savedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+            const updatedUsers = savedUsers.filter((u: User) => u.id !== userId);
+            localStorage.setItem('users', JSON.stringify(updatedUsers));
+            
+            // If deleted user was stored as currentUserId, clear it
+            const savedCurrentUserId = localStorage.getItem('currentUserId');
+            if (savedCurrentUserId === userId) {
+                localStorage.removeItem('currentUserId');
+            }
+        } catch (e) {
+            // eslint-disable-next-line no-alert
+            alert(String((e as any)?.message || e));
+        }
     };
 
     const handleUpdateUser = async (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => {
@@ -857,7 +891,7 @@ const App: React.FC = () => {
             <header className="bg-base-200/80 dark:bg-dark-200/80 backdrop-blur-sm sticky top-0 z-20 border-b border-base-300 dark:border-dark-300">
                 <div className="container mx-auto px-1 sm:px-2 lg:px-2">
                     <div className="flex h-16 items-center justify-between">
-                         <div className="flex items-center gap-2 -ml-1 sm:-ml-10">
+                         <div className="flex items-center gap-2 -ml-1 sm:-ml-5">
                              <img
                                src="/components/assets/logo.png"
                                alt="Kauvery Logo"
