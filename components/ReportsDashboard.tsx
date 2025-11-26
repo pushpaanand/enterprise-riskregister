@@ -341,7 +341,7 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ risks, incidents, d
                       <input type="checkbox" checked={!!selectedRiskRows[r.id]} onChange={(e) => setSelectedRiskRows(s => ({ ...s, [r.id]: e.target.checked }))} />
                     </td>
                     {riskColumns.map(c => selectedRiskCols[c.key] && (
-                      <td key={c.key} className={`px-3 py-2 text-sm text-base-content dark:text-dark-content ${c.key === 'category' ? 'whitespace-nowrap' : ''}`}>
+                      <td key={c.key} className={`px-3 py-2 text-sm text-base-content dark:text-dark-content ${c.key === 'category' ? 'whitespace-nowrap max-w-[200px] overflow-hidden text-ellipsis' : ''}`}>
                         {c.key === 'updatedAt' ? new Date(r.updatedAt).toLocaleDateString() :
                          // @ts-ignore
                          (r[c.key] ?? (r as any)[c.key] ?? '')}

@@ -59,12 +59,12 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
 
   return (
     <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow w-full overflow-x-auto">
-      <table className="w-full min-w-[1800px] divide-y divide-base-300 dark:divide-dark-300 table-fixed">
+      <table className="w-full min-w-[1800px] divide-y divide-base-300 dark:divide-dark-300">
         <thead className="bg-brand-secondary">
           <tr>
-            <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-brand-primary sm:pl-6">Risk ID</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Category</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Risk Description</th>
+            <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-brand-primary sm:pl-6 w-32">Risk ID</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary w-48">Category</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary min-w-[300px]">Risk Description</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Department</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Identification</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Existing Control</th>
@@ -85,7 +85,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
           {risks.map((risk) => (
             <tr key={risk.id} onClick={() => onRowClick && onRowClick(risk)} className={onRowClick ? 'cursor-pointer hover:bg-base-100 dark:hover:bg-dark-100' : ''}>
               <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 text-base-content dark:text-dark-content">{risk.riskNo || risk.id}</td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.category || '-'}</td>
+              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content overflow-hidden text-ellipsis max-w-[192px]">{risk.category || '-'}</td>
               <td className="whitespace-normal px-3 py-4 text-sm">
                 <div className="text-base-content dark:text-dark-content break-words max-w-none">{risk.description}</div>
               </td>

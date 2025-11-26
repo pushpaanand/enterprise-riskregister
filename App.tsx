@@ -440,6 +440,13 @@ const App: React.FC = () => {
         // This prevents auto-login when the page reloads after redirect
         localStorage.removeItem('currentUserId');
         localStorage.removeItem('azureUser');
+        // Also clear users array to remove any cached user data
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
+        const updatedUsers = users.filter((u: User) => u.id !== currentUser?.id);
+        localStorage.setItem('users', JSON.stringify(updatedUsers));
+        
+        // Mark that user explicitly logged out - prevents auto-login
+        sessionStorage.setItem('userLoggedOut', 'true');
         
         // Clear state immediately
         setCurrentUser(null);
