@@ -61,12 +61,19 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     }
   };
 
-  const handleLogin = () => {
+  const handleLogin = (e?: React.MouseEvent<HTMLButtonElement>) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     setError('');
+    setLoading(true);
     // Redirect to Azure Static Web Apps login endpoint
     // Include post_login_redirect_uri to redirect back to home page after authentication
-    const homePageUrl = window.location.origin;
-    window.location.href = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(homePageUrl)}`;
+    // Use just the origin for redirect URI (Azure Static Web Apps best practice)
+    const redirectUri = window.location.origin;
+    const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+    console.log('Redirecting to Azure login:', loginUrl);
+    // Use href instead of replace to ensure proper navigation
+    window.location.href = loginUrl;
   };
 
   const handleLogout = () => {
@@ -172,6 +179,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         {!azureUser ? (
           <div className="space-y-4">
             <button
+              type="button"
               onClick={handleLogin}
               disabled={loading}
               className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 flex items-center justify-center gap-2"
