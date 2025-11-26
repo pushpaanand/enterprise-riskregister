@@ -43,147 +43,60 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     return () => clearTimeout(timer);
   }, []);
 
-  // Also check auth when returning from Azure login (if login was in progress)
-  useEffect(() => {
-    const loginInProgress = sessionStorage.getItem('azureLoginInProgress');
-    const userLoggedOut = sessionStorage.getItem('userLoggedOut');
-    
-    // Don't auto-login if user was logged out
-    if (userLoggedOut === 'true') {
-      sessionStorage.removeItem('azureLoginInProgress');
-      setLoading(false);
-      return;
-    }
-    
-    if (loginInProgress === 'true') {
-      // We're returning from Azure login, check auth after a delay
-      const timer = setTimeout(async () => {
-        try {
-          // Double-check userLoggedOut flag before proceeding
-          const stillLoggedOut = sessionStorage.getItem('userLoggedOut');
-          if (stillLoggedOut === 'true') {
-            sessionStorage.removeItem('azureLoginInProgress');
-            setLoading(false);
-            return;
-          }
-          
-          // CRITICAL: Check if currentUserId exists - if not, don't auto-login
-          // This prevents auto-login after logout even if Azure session exists
-          const currentUserId = localStorage.getItem('currentUserId');
-          if (!currentUserId) {
-            // No currentUserId means user logged out - don't auto-login
-            console.log('No currentUserId found - user was logged out, not auto-logging in');
-            sessionStorage.removeItem('azureLoginInProgress');
-            setLoading(false);
-            return;
-          }
-          
-          const res = await fetch('/.auth/me');
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.clientPrincipal) {
-              // Double-check currentUserId again before proceeding
-              const stillNoUserId = !localStorage.getItem('currentUserId');
-              if (stillNoUserId) {
-                console.log('currentUserId still missing - not auto-logging in');
-                sessionStorage.removeItem('azureLoginInProgress');
-                setLoading(false);
-                return;
-              }
-              
-              // User authenticated with Azure AND has currentUserId, proceed with login
-              setAzureUser(data.clientPrincipal);
-              sessionStorage.removeItem('azureLoginInProgress');
-              await handleAzureLogin(data.clientPrincipal);
-            } else {
-              sessionStorage.removeItem('azureLoginInProgress');
-              setLoading(false);
-            }
-          } else {
-            sessionStorage.removeItem('azureLoginInProgress');
-            setLoading(false);
-          }
-        } catch (err) {
-          console.error('Post-login auth check failed:', err);
-          sessionStorage.removeItem('azureLoginInProgress');
-          setLoading(false);
-        }
-      }, 200);
-      
-      return () => clearTimeout(timer);
-    }
-  }, []);
-
   const checkAuth = async () => {
     try {
-      // Check if we're in the middle of a forced fresh login flow
       const forceFreshLogin = sessionStorage.getItem('forceFreshLogin');
       if (forceFreshLogin === 'true') {
-        // Don't check auth yet, wait for the redirect to login
         setLoading(false);
         return;
       }
-      
-      // Check if user explicitly logged out - don't auto-login in this case
-      const userLoggedOut = sessionStorage.getItem('userLoggedOut');
-      if (userLoggedOut === 'true') {
-        // User explicitly logged out, clear Azure user state and don't auto-login
+
+      const loginInProgress = sessionStorage.getItem('azureLoginInProgress') === 'true';
+      const userLoggedOut = sessionStorage.getItem('userLoggedOut') === 'true';
+
+      if (userLoggedOut && !loginInProgress) {
         setAzureUser(null);
-        // Clear any cached Azure data
         localStorage.removeItem('azureUser');
-        // Don't remove userLoggedOut flag here - keep it until user explicitly tries to login
         sessionStorage.removeItem('azureLoginInProgress');
         setLoading(false);
         return;
       }
-      
-      // Also check if currentUserId was cleared (logout happened)
+
       const currentUserId = localStorage.getItem('currentUserId');
-      if (!currentUserId) {
-        // No currentUserId means user logged out, don't auto-login even if Azure auth exists
-        // Clear Azure user state to prevent showing "signed in" message
+      if (!currentUserId && !loginInProgress) {
         setAzureUser(null);
         localStorage.removeItem('azureUser');
         sessionStorage.removeItem('azureLoginInProgress');
         setLoading(false);
         return;
       }
-      
-      // Azure Static Web Apps provides user info at /.auth/me
+
       const res = await fetch('/.auth/me');
       if (res.ok) {
         const data = await res.json();
-        if (data && data.clientPrincipal) {
-          // User is authenticated with Azure
-          // Only set azureUser if we have currentUserId (user is logged in to our app)
+        const principal = data?.clientPrincipal;
+
+        if (principal) {
           if (currentUserId) {
-            setAzureUser(data.clientPrincipal);
-            // User is already logged in to our app
+            setAzureUser(principal);
             sessionStorage.removeItem('azureLoginInProgress');
             setLoading(false);
             return;
           }
-          
-          // Azure auth exists but no currentUserId - user needs to click sign in
-          // Don't set azureUser state to prevent showing "signed in" message
-          // This forces them to click the sign in button
-          setAzureUser(null);
-          sessionStorage.removeItem('azureLoginInProgress');
-          setLoading(false);
-        } else {
-          // No Azure authentication
-          setAzureUser(null);
-          localStorage.removeItem('azureUser');
-          sessionStorage.removeItem('azureLoginInProgress');
-          setLoading(false);
+
+          if (loginInProgress) {
+            setAzureUser(principal);
+            await handleAzureLogin(principal);
+            return;
+          }
         }
-      } else {
-        // No Azure authentication
-        setAzureUser(null);
-        localStorage.removeItem('azureUser');
-        sessionStorage.removeItem('azureLoginInProgress');
-        setLoading(false);
       }
+
+      // No Azure authentication or not in login flow
+      setAzureUser(null);
+      localStorage.removeItem('azureUser');
+      sessionStorage.removeItem('azureLoginInProgress');
+      setLoading(false);
     } catch (err: any) {
       console.error('Auth check failed:', err);
       setAzureUser(null);
@@ -325,25 +238,13 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   };
 
   const handleAzureLogin = async (principal: AzureUser) => {
-    // Double-check userLoggedOut flag before proceeding
     const userLoggedOut = sessionStorage.getItem('userLoggedOut');
     if (userLoggedOut === 'true') {
-      // User was logged out, don't proceed with login
-      console.log('User was logged out - blocking auto-login');
       setAzureUser(null);
       setLoading(false);
       return;
     }
-    
-    // CRITICAL: Check if currentUserId exists - if not, user was logged out
-    const currentUserId = localStorage.getItem('currentUserId');
-    if (!currentUserId) {
-      console.log('No currentUserId - user was logged out, blocking auto-login');
-      setAzureUser(null);
-      setLoading(false);
-      return;
-    }
-    
+
     setLoading(true);
     setError('');
     try {
@@ -381,15 +282,6 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         return;
       }
       
-      // Double-check currentUserId - if it was cleared during the API call, don't login
-      const currentUserIdCheck = localStorage.getItem('currentUserId');
-      if (!currentUserIdCheck) {
-        console.log('currentUserId was cleared during API call - blocking login');
-        setAzureUser(null);
-        setLoading(false);
-        return;
-      }
-
       const apiUser = data.user as any;
       // Use user data from database (role comes from database, not Azure AD)
       const selectedUser: User = {
@@ -409,11 +301,13 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       
       // Clear the logged out flag since login was successful
       sessionStorage.removeItem('userLoggedOut');
+      sessionStorage.removeItem('azureLoginInProgress');
       
       onLogin(selectedUser);
     } catch (err: any) {
       setError(String(err?.message ?? err));
     } finally {
+      sessionStorage.removeItem('azureLoginInProgress');
       setLoading(false);
     }
   };
