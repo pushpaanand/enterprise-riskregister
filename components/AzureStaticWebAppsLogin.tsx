@@ -67,11 +67,31 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
             return;
           }
           
+          // CRITICAL: Check if currentUserId exists - if not, don't auto-login
+          // This prevents auto-login after logout even if Azure session exists
+          const currentUserId = localStorage.getItem('currentUserId');
+          if (!currentUserId) {
+            // No currentUserId means user logged out - don't auto-login
+            console.log('No currentUserId found - user was logged out, not auto-logging in');
+            sessionStorage.removeItem('azureLoginInProgress');
+            setLoading(false);
+            return;
+          }
+          
           const res = await fetch('/.auth/me');
           if (res.ok) {
             const data = await res.json();
             if (data && data.clientPrincipal) {
-              // User authenticated with Azure, proceed with login
+              // Double-check currentUserId again before proceeding
+              const stillNoUserId = !localStorage.getItem('currentUserId');
+              if (stillNoUserId) {
+                console.log('currentUserId still missing - not auto-logging in');
+                sessionStorage.removeItem('azureLoginInProgress');
+                setLoading(false);
+                return;
+              }
+              
+              // User authenticated with Azure AND has currentUserId, proceed with login
               setAzureUser(data.clientPrincipal);
               sessionStorage.removeItem('azureLoginInProgress');
               await handleAzureLogin(data.clientPrincipal);
@@ -216,10 +236,11 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     
     // If user wasn't logged out, check if Azure auth already exists
     if (azureUser) {
-      // Check if currentUserId exists - if not, don't auto-login
+      // ALWAYS check currentUserId - if not, redirect to login (don't auto-login)
       const currentUserId = localStorage.getItem('currentUserId');
       if (!currentUserId) {
-        // No currentUserId means user needs to go through login flow
+        // No currentUserId means user was logged out - redirect to login page
+        console.log('Azure user exists but no currentUserId - redirecting to login');
         sessionStorage.setItem('azureLoginInProgress', 'true');
         const redirectUri = window.location.origin;
         const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
@@ -237,19 +258,21 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       if (res.ok) {
         const data = await res.json();
         if (data && data.clientPrincipal) {
-          // Check if currentUserId exists
+          // CRITICAL: Check if currentUserId exists - if not, redirect to login (don't auto-login)
           const currentUserId = localStorage.getItem('currentUserId');
-          if (currentUserId) {
-            // Azure session exists and user has currentUserId, use it
-            setAzureUser(data.clientPrincipal);
-            await handleAzureLogin(data.clientPrincipal);
+          if (!currentUserId) {
+            // Azure session exists but no currentUserId - user was logged out
+            // Redirect to login page to force fresh login
+            console.log('Azure session exists but no currentUserId - redirecting to login');
+            sessionStorage.setItem('azureLoginInProgress', 'true');
+            const redirectUri = window.location.origin;
+            const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+            window.location.href = loginUrl;
             return;
           }
-          // Azure session exists but no currentUserId - redirect to login
-          sessionStorage.setItem('azureLoginInProgress', 'true');
-          const redirectUri = window.location.origin;
-          const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
-          window.location.href = loginUrl;
+          // Azure session exists and user has currentUserId, use it
+          setAzureUser(data.clientPrincipal);
+          await handleAzureLogin(data.clientPrincipal);
           return;
         }
       }
@@ -303,6 +326,16 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     const userLoggedOut = sessionStorage.getItem('userLoggedOut');
     if (userLoggedOut === 'true') {
       // User was logged out, don't proceed with login
+      console.log('User was logged out - blocking auto-login');
+      setAzureUser(null);
+      setLoading(false);
+      return;
+    }
+    
+    // CRITICAL: Check if currentUserId exists - if not, user was logged out
+    const currentUserId = localStorage.getItem('currentUserId');
+    if (!currentUserId) {
+      console.log('No currentUserId - user was logged out, blocking auto-login');
       setAzureUser(null);
       setLoading(false);
       return;
@@ -339,6 +372,16 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       // Check again before setting localStorage
       const stillLoggedOut = sessionStorage.getItem('userLoggedOut');
       if (stillLoggedOut === 'true') {
+        console.log('UserLoggedOut flag still set - blocking login');
+        setAzureUser(null);
+        setLoading(false);
+        return;
+      }
+      
+      // Double-check currentUserId - if it was cleared during the API call, don't login
+      const currentUserIdCheck = localStorage.getItem('currentUserId');
+      if (!currentUserIdCheck) {
+        console.log('currentUserId was cleared during API call - blocking login');
         setAzureUser(null);
         setLoading(false);
         return;
