@@ -21,6 +21,20 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
   // Check if user is already authenticated
   useEffect(() => {
+    // Check if we're returning from a forced logout before login
+    const forceFreshLogin = sessionStorage.getItem('forceFreshLogin');
+    const pendingLoginUrl = sessionStorage.getItem('pendingLoginUrl');
+    
+    if (forceFreshLogin === 'true' && pendingLoginUrl) {
+      // We just completed a logout, now redirect to login
+      sessionStorage.removeItem('forceFreshLogin');
+      sessionStorage.removeItem('pendingLoginUrl');
+      sessionStorage.setItem('azureLoginInProgress', 'true');
+      console.log('Redirecting to fresh login after forced logout');
+      window.location.href = pendingLoginUrl;
+      return;
+    }
+    
     // Add a small delay to ensure Azure has finished processing the redirect
     const timer = setTimeout(() => {
       checkAuth();
@@ -82,6 +96,14 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
   const checkAuth = async () => {
     try {
+      // Check if we're in the middle of a forced fresh login flow
+      const forceFreshLogin = sessionStorage.getItem('forceFreshLogin');
+      if (forceFreshLogin === 'true') {
+        // Don't check auth yet, wait for the redirect to login
+        setLoading(false);
+        return;
+      }
+      
       // Check if user explicitly logged out - don't auto-login in this case
       const userLoggedOut = sessionStorage.getItem('userLoggedOut');
       if (userLoggedOut === 'true') {
@@ -174,15 +196,21 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       const users = JSON.parse(localStorage.getItem('users') || '[]');
       localStorage.setItem('users', JSON.stringify([]));
       
-      // Force redirect to Azure login with a parameter to ensure fresh login
-      // Add a timestamp to force cache busting and ensure Azure shows login page
-      sessionStorage.setItem('azureLoginInProgress', 'true');
+      // First, ensure Azure session is fully cleared by calling logout again
+      // Then redirect to login page
+      // This ensures we get a fresh login even if Azure session persists
       const redirectUri = window.location.origin;
-      const timestamp = new Date().getTime();
-      // Try to force re-authentication by adding a unique parameter
-      const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}&_force_login=${timestamp}`;
-      console.log('User was logged out - forcing fresh Azure login:', loginUrl);
-      window.location.href = loginUrl;
+      const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+      
+      // First logout to clear any remaining Azure session, then redirect to login
+      // We'll use a two-step process: logout -> login
+      sessionStorage.setItem('forceFreshLogin', 'true');
+      sessionStorage.setItem('pendingLoginUrl', loginUrl);
+      
+      // Redirect to logout first to ensure session is cleared
+      const logoutUrl = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`;
+      console.log('User was logged out - clearing Azure session first, then will login:', logoutUrl);
+      window.location.href = logoutUrl;
       return;
     }
     
