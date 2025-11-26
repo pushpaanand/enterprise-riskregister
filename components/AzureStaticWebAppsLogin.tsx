@@ -32,10 +32,27 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   // Also check auth when returning from Azure login (if login was in progress)
   useEffect(() => {
     const loginInProgress = sessionStorage.getItem('azureLoginInProgress');
+    const userLoggedOut = sessionStorage.getItem('userLoggedOut');
+    
+    // Don't auto-login if user was logged out
+    if (userLoggedOut === 'true') {
+      sessionStorage.removeItem('azureLoginInProgress');
+      setLoading(false);
+      return;
+    }
+    
     if (loginInProgress === 'true') {
       // We're returning from Azure login, check auth after a delay
       const timer = setTimeout(async () => {
         try {
+          // Double-check userLoggedOut flag before proceeding
+          const stillLoggedOut = sessionStorage.getItem('userLoggedOut');
+          if (stillLoggedOut === 'true') {
+            sessionStorage.removeItem('azureLoginInProgress');
+            setLoading(false);
+            return;
+          }
+          
           const res = await fetch('/.auth/me');
           if (res.ok) {
             const data = await res.json();
@@ -151,11 +168,19 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       // Clear any cached Azure user state
       setAzureUser(null);
       localStorage.removeItem('azureUser');
+      localStorage.removeItem('currentUserId');
       
-      // Force redirect to Azure login (this will create a fresh session)
+      // Clear users array
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      localStorage.setItem('users', JSON.stringify([]));
+      
+      // Force redirect to Azure login with a parameter to ensure fresh login
+      // Add a timestamp to force cache busting and ensure Azure shows login page
       sessionStorage.setItem('azureLoginInProgress', 'true');
       const redirectUri = window.location.origin;
-      const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const timestamp = new Date().getTime();
+      // Try to force re-authentication by adding a unique parameter
+      const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}&_force_login=${timestamp}`;
       console.log('User was logged out - forcing fresh Azure login:', loginUrl);
       window.location.href = loginUrl;
       return;
@@ -163,7 +188,17 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     
     // If user wasn't logged out, check if Azure auth already exists
     if (azureUser) {
-      // User is already authenticated with Azure, just need to log them into our app
+      // Check if currentUserId exists - if not, don't auto-login
+      const currentUserId = localStorage.getItem('currentUserId');
+      if (!currentUserId) {
+        // No currentUserId means user needs to go through login flow
+        sessionStorage.setItem('azureLoginInProgress', 'true');
+        const redirectUri = window.location.origin;
+        const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+        window.location.href = loginUrl;
+        return;
+      }
+      // User is already authenticated with Azure and has currentUserId, proceed with login
       handleAzureLogin(azureUser);
       return;
     }
@@ -174,9 +209,19 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       if (res.ok) {
         const data = await res.json();
         if (data && data.clientPrincipal) {
-          // Azure session exists, use it
-          setAzureUser(data.clientPrincipal);
-          await handleAzureLogin(data.clientPrincipal);
+          // Check if currentUserId exists
+          const currentUserId = localStorage.getItem('currentUserId');
+          if (currentUserId) {
+            // Azure session exists and user has currentUserId, use it
+            setAzureUser(data.clientPrincipal);
+            await handleAzureLogin(data.clientPrincipal);
+            return;
+          }
+          // Azure session exists but no currentUserId - redirect to login
+          sessionStorage.setItem('azureLoginInProgress', 'true');
+          const redirectUri = window.location.origin;
+          const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+          window.location.href = loginUrl;
           return;
         }
       }
@@ -226,6 +271,15 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   };
 
   const handleAzureLogin = async (principal: AzureUser) => {
+    // Double-check userLoggedOut flag before proceeding
+    const userLoggedOut = sessionStorage.getItem('userLoggedOut');
+    if (userLoggedOut === 'true') {
+      // User was logged out, don't proceed with login
+      setAzureUser(null);
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {
@@ -254,6 +308,14 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         throw new Error(data?.error || 'Failed to authenticate with backend');
       }
 
+      // Check again before setting localStorage
+      const stillLoggedOut = sessionStorage.getItem('userLoggedOut');
+      if (stillLoggedOut === 'true') {
+        setAzureUser(null);
+        setLoading(false);
+        return;
+      }
+
       const apiUser = data.user as any;
       // Use user data from database (role comes from database, not Azure AD)
       const selectedUser: User = {
@@ -270,6 +332,10 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
       const updated = [selectedUser, ...existingUsers.filter(u => u.id !== selectedUser.id)];
       localStorage.setItem('users', JSON.stringify(updated));
+      
+      // Clear the logged out flag since login was successful
+      sessionStorage.removeItem('userLoggedOut');
+      
       onLogin(selectedUser);
     } catch (err: any) {
       setError(String(err?.message ?? err));

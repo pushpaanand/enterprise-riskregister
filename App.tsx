@@ -433,33 +433,41 @@ const App: React.FC = () => {
     }, [pendingLinkAction, currentUser]);
 
     const handleLogout = () => {
-        // Check if user is logged in via Azure AD
-        const azureUser = localStorage.getItem('azureUser');
+        // Get currentUserId before clearing
+        const currentUserIdToRemove = currentUser?.id || localStorage.getItem('currentUserId');
         
         // Clear ALL authentication-related localStorage data BEFORE logout
         // This prevents auto-login when the page reloads after redirect
         localStorage.removeItem('currentUserId');
         localStorage.removeItem('azureUser');
-        // Also clear users array to remove any cached user data
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const updatedUsers = users.filter((u: User) => u.id !== currentUser?.id);
-        localStorage.setItem('users', JSON.stringify(updatedUsers));
+        
+        // Clear users array completely or remove only the current user
+        if (currentUserIdToRemove) {
+            const users = JSON.parse(localStorage.getItem('users') || '[]');
+            const updatedUsers = users.filter((u: User) => u.id !== currentUserIdToRemove);
+            localStorage.setItem('users', JSON.stringify(updatedUsers));
+        } else {
+            // If no currentUserId, clear all users to be safe
+            localStorage.setItem('users', JSON.stringify([]));
+        }
         
         // Mark that user explicitly logged out - prevents auto-login
+        // This flag MUST persist until user explicitly clicks sign in
         sessionStorage.setItem('userLoggedOut', 'true');
+        
+        // Clear any login in progress flags
+        sessionStorage.removeItem('azureLoginInProgress');
         
         // Clear state immediately
         setCurrentUser(null);
         setAdminView('risks');
         setManagerView('risks');
         
-        if (azureUser) {
-            // Azure AD logout - redirect to Azure Static Web Apps logout endpoint
-            // This will clear the Azure AD session on the server side
-            const homePageUrl = window.location.origin;
-            window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}`;
-        }
-        // For regular logout, we've already cleared everything above, so no redirect needed
+        // Always redirect to Azure logout (even if not Azure user, to be safe)
+        // This ensures Azure session is cleared if it exists
+        const homePageUrl = window.location.origin;
+        const timestamp = new Date().getTime();
+        window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}&_=${timestamp}`;
     };
 
     // Risk CRUD
