@@ -193,6 +193,12 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     }
   };
 
+  const buildLoginUrl = () => {
+    const redirectUri = window.location.origin;
+    const nonce = Date.now();
+    return `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}&prompt=login&nonce=${nonce}`;
+  };
+
   const handleLogin = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     e?.preventDefault();
     e?.stopPropagation();
@@ -215,20 +221,20 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       // Clear users array
       const users = JSON.parse(localStorage.getItem('users') || '[]');
       localStorage.setItem('users', JSON.stringify([]));
-      
+
       // First, ensure Azure session is fully cleared by calling logout again
       // Then redirect to login page
       // This ensures we get a fresh login even if Azure session persists
-      const redirectUri = window.location.origin;
-      const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
-      
+      const loginUrl = buildLoginUrl();
+
       // First logout to clear any remaining Azure session, then redirect to login
       // We'll use a two-step process: logout -> login
       sessionStorage.setItem('forceFreshLogin', 'true');
       sessionStorage.setItem('pendingLoginUrl', loginUrl);
       
       // Redirect to logout first to ensure session is cleared
-      const logoutUrl = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(redirectUri)}`;
+      const redirectUri = window.location.origin;
+      const logoutUrl = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(redirectUri)}&nonce=${Date.now()}`;
       console.log('User was logged out - clearing Azure session first, then will login:', logoutUrl);
       window.location.href = logoutUrl;
       return;
@@ -242,8 +248,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         // No currentUserId means user was logged out - redirect to login page
         console.log('Azure user exists but no currentUserId - redirecting to login');
         sessionStorage.setItem('azureLoginInProgress', 'true');
-        const redirectUri = window.location.origin;
-        const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+        const loginUrl = buildLoginUrl();
         window.location.href = loginUrl;
         return;
       }
@@ -265,8 +270,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
             // Redirect to login page to force fresh login
             console.log('Azure session exists but no currentUserId - redirecting to login');
             sessionStorage.setItem('azureLoginInProgress', 'true');
-            const redirectUri = window.location.origin;
-            const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+            const loginUrl = buildLoginUrl();
             window.location.href = loginUrl;
             return;
           }
@@ -282,8 +286,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     
     // No Azure session exists, redirect to Azure login
     sessionStorage.setItem('azureLoginInProgress', 'true');
-    const redirectUri = window.location.origin;
-    const loginUrl = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const loginUrl = buildLoginUrl();
     console.log('Redirecting to Azure login:', loginUrl);
     window.location.href = loginUrl;
   };
