@@ -29,10 +29,52 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     return () => clearTimeout(timer);
   }, []);
 
+  // Also check auth when returning from Azure login (if login was in progress)
+  useEffect(() => {
+    const loginInProgress = sessionStorage.getItem('azureLoginInProgress');
+    if (loginInProgress === 'true') {
+      // We're returning from Azure login, check auth after a delay
+      const timer = setTimeout(async () => {
+        try {
+          const res = await fetch('/.auth/me');
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.clientPrincipal) {
+              // User authenticated with Azure, proceed with login
+              setAzureUser(data.clientPrincipal);
+              sessionStorage.removeItem('azureLoginInProgress');
+              await handleAzureLogin(data.clientPrincipal);
+            } else {
+              sessionStorage.removeItem('azureLoginInProgress');
+              setLoading(false);
+            }
+          } else {
+            sessionStorage.removeItem('azureLoginInProgress');
+            setLoading(false);
+          }
+        } catch (err) {
+          console.error('Post-login auth check failed:', err);
+          sessionStorage.removeItem('azureLoginInProgress');
+          setLoading(false);
+        }
+      }, 200);
+      
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   const checkAuth = async () => {
     try {
-      // Check if we just came back from Azure login
-      const loginInProgress = sessionStorage.getItem('azureLoginInProgress');
+      // Check if user explicitly logged out - don't auto-login in this case
+      const userLoggedOut = sessionStorage.getItem('userLoggedOut');
+      if (userLoggedOut === 'true') {
+        // User explicitly logged out, clear Azure user state and don't auto-login
+        setAzureUser(null);
+        sessionStorage.removeItem('userLoggedOut');
+        sessionStorage.removeItem('azureLoginInProgress');
+        setLoading(false);
+        return;
+      }
       
       // Azure Static Web Apps provides user info at /.auth/me
       const res = await fetch('/.auth/me');
@@ -43,30 +85,34 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
           setAzureUser(data.clientPrincipal);
           const currentUserId = localStorage.getItem('currentUserId');
           
-          // If we have a currentUserId, user is already logged in to our app
+          // Only auto-login if we have a currentUserId (user was previously logged in)
+          // If no currentUserId, user needs to explicitly click sign in
           if (currentUserId) {
-            // Clear the login in progress flag
+            // User is already logged in to our app
             sessionStorage.removeItem('azureLoginInProgress');
             setLoading(false);
             return;
           }
           
-          // Otherwise, proceed with Azure login to create/get user in our system
-          // Clear the login in progress flag before proceeding
+          // Azure auth exists but no currentUserId - user needs to click sign in
+          // Don't auto-login, just show the login button
           sessionStorage.removeItem('azureLoginInProgress');
-          await handleAzureLogin(data.clientPrincipal);
+          setLoading(false);
         } else {
           // No Azure authentication
+          setAzureUser(null);
           sessionStorage.removeItem('azureLoginInProgress');
           setLoading(false);
         }
       } else {
         // No Azure authentication
+        setAzureUser(null);
         sessionStorage.removeItem('azureLoginInProgress');
         setLoading(false);
       }
     } catch (err: any) {
       console.error('Auth check failed:', err);
+      setAzureUser(null);
       sessionStorage.removeItem('azureLoginInProgress');
       setLoading(false);
     }
@@ -76,8 +122,19 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     e?.preventDefault();
     e?.stopPropagation();
     setError('');
+    
+    // Check if Azure auth already exists - if so, proceed with login directly
+    if (azureUser) {
+      // User is already authenticated with Azure, just need to log them into our app
+      handleAzureLogin(azureUser);
+      return;
+    }
+    
     // Mark that we're initiating a login redirect
     sessionStorage.setItem('azureLoginInProgress', 'true');
+    // Clear the logged out flag since user is trying to login
+    sessionStorage.removeItem('userLoggedOut');
+    
     // Redirect to Azure Static Web Apps login endpoint
     // Include post_login_redirect_uri to redirect back to home page after authentication
     // Use just the origin for redirect URI (Azure Static Web Apps best practice)
@@ -90,6 +147,14 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   };
 
   const handleLogout = () => {
+    // Clear local storage first
+    localStorage.removeItem('currentUserId');
+    localStorage.removeItem('azureUser');
+    setAzureUser(null);
+    
+    // Mark that user explicitly logged out - prevents auto-login
+    sessionStorage.setItem('userLoggedOut', 'true');
+    
     // Redirect to Azure Static Web Apps logout endpoint
     // Include post_logout_redirect_uri to redirect back to home page after logout
     const homePageUrl = window.location.origin;
