@@ -307,7 +307,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 onChange={(e) => setIdentificationFilter(e.target.value)}
                 className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
               >
-                {['All','Inherent risk','Residual risk'].map(opt => (
+                {['All','Inherent','Residual'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
