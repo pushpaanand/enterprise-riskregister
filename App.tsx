@@ -45,6 +45,22 @@ function clearLinkActionFromUrl() {
     }
 }
 
+const OPERATIONS_DEPARTMENT_ALIASES = [
+    'operations',
+    'operations unit',
+    'operations department',
+    'operations - unit',
+    'operation unit',
+    'operations team'
+];
+const DEFAULT_OPERATIONS_LABEL = 'Operations';
+
+const isOperationsDepartment = (value?: string | null) => {
+    if (!value) return false;
+    const normalized = value.toString().trim().toLowerCase();
+    return OPERATIONS_DEPARTMENT_ALIASES.includes(normalized);
+};
+
 const App: React.FC = () => {
     // State management with localStorage persistence
     const [risks, setRisks] = useState<Risk[]>(() => {
@@ -68,6 +84,8 @@ const App: React.FC = () => {
     });
     const [adminView, setAdminView] = useState<'risks' | 'admin' | 'reports'>('risks');
     const [managerView, setManagerView] = useState<'risks' | 'reports'>('risks');
+    const [unitHeadView, setUnitHeadView] = useState<'risks' | 'reports'>('risks');
+    const [userView, setUserView] = useState<'risks' | 'reports'>('risks');
     const [allRisks, setAllRisks] = useState<Risk[]>([]);
     const [adminDept, setAdminDept] = useState<string>('');
     const [adminDeptOptions, setAdminDeptOptions] = useState<string[]>([]);
@@ -88,6 +106,33 @@ const App: React.FC = () => {
     const [summaryRiskId, setSummaryRiskId] = useState<string | null>(null);
     const [pendingLinkAction, setPendingLinkAction] = useState<LinkAction | null>(() => parseLinkActionFromLocation());
     const linkActionProcessingRef = useRef(false);
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(apiUrl('/departments'));
+                if (!res.ok) return;
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    const names = Array.from(new Set(
+                        data
+                            .map((d: any) => (d.Name || d.name || '').toString().trim())
+                            .filter((name: string) => !!name)
+                    ));
+                    if (names.length) {
+                        setAdminDeptOptions(['All', ...names]);
+                        if (!adminDept) {
+                            setAdminDept('All');
+                        }
+                    }
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to load departments list', err);
+            }
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         localStorage.setItem('risks', JSON.stringify(risks));
@@ -163,17 +208,23 @@ const App: React.FC = () => {
                         // eslint-disable-next-line no-console
                         console.log('Risks mapped (first 5)', mapped.slice(0,5).map((x:any)=>({riskNo:x.riskNo, identification:x.identification, status:x.status, dept:x.department})));
                         // Role-based scoping for user onboarding view
-                        if (currentUser.role === 'user' && currentUser.department) {
-                            setRisks(mapped.filter((r: any) => String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase()));
+                        if (currentUser.role === 'user') {
+                            const ownRisks = mapped.filter((r: any) => r.createdByUserId === currentUser.id);
+                            setRisks(ownRisks);
                         } else if (currentUser.role === 'manager' && currentUser.department) {
                             setRisks(mapped.filter((r: any) => String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase()));
+                        } else if (currentUser.role === 'unit_head') {
+                            setRisks(mapped.filter((r: any) => isOperationsDepartment(r.department)));
                         } else if (currentUser.role === 'admin') {
                             const open = (mapped as any[]).filter(r => String(r.status).toLowerCase() !== 'eliminated');
                             const closed = (mapped as any[]).filter(r => String(r.status).toLowerCase() === 'eliminated');
                             setAllRisks(mapped as any);
                             const allDepts = Array.from(new Set((mapped as any[]).map(r => (r.department || '').toString()).filter(Boolean))) as string[];
-                            const opts = ['All', ...allDepts];
-                            setAdminDeptOptions(opts);
+                            const fallbackOptions = ['All', ...allDepts];
+                            if (!adminDeptOptions.length && fallbackOptions.length) {
+                                setAdminDeptOptions(fallbackOptions);
+                            }
+                            const opts = adminDeptOptions.length ? adminDeptOptions : fallbackOptions;
                             const effDept = adminDept && opts.includes(adminDept) ? adminDept : (opts[0] || 'All');
                             if (!adminDept && effDept) setAdminDept(effDept);
                             const base = adminStatus === 'Open' ? open : (adminStatus === 'Closed' ? closed : ([...open, ...closed] as any[]));
@@ -198,6 +249,8 @@ const App: React.FC = () => {
                         params.set('createdBy', currentUser.id);
                     } else if (currentUser.role === 'manager' && currentUser.department) {
                         params.set('department', currentUser.department);
+                    } else if (currentUser.role === 'unit_head') {
+                        params.set('department', DEFAULT_OPERATIONS_LABEL);
                     } else if (currentUser.role === 'admin') {
                         if (adminDept && adminDept !== 'All') params.set('department', adminDept);
                     }
@@ -231,7 +284,7 @@ const App: React.FC = () => {
                 }
             })();
         }
-    }, [currentUser, adminDept, adminStatus]);
+    }, [currentUser, adminDept, adminStatus, adminDeptOptions]);
 
     // Recompute admin risk filter when adminDept changes or allRisks update
     useEffect(() => {
@@ -239,14 +292,17 @@ const App: React.FC = () => {
         const open = allRisks.filter(r => String(r.status).toLowerCase() !== 'eliminated');
         const closed = allRisks.filter(r => String(r.status).toLowerCase() === 'eliminated');
         const allDepts = Array.from(new Set(allRisks.map(r => (r.department || '').toString()).filter(Boolean)));
-        const opts = ['All', ...allDepts];
-        setAdminDeptOptions(opts);
+        const fallbackOptions = ['All', ...allDepts];
+        if (!adminDeptOptions.length && fallbackOptions.length) {
+            setAdminDeptOptions(fallbackOptions);
+        }
+        const opts = adminDeptOptions.length ? adminDeptOptions : fallbackOptions;
         const effDept = adminDept && opts.includes(adminDept) ? adminDept : (opts[0] || 'All');
         if (!adminDept && effDept) setAdminDept(effDept);
         const base = adminStatus === 'Open' ? open : (adminStatus === 'Closed' ? closed : [...open, ...closed]);
         const filtered = effDept && effDept !== 'All' ? base.filter(r => String(r.department || '').toLowerCase() === effDept.toLowerCase()) : base;
         setRisks(filtered);
-    }, [currentUser, adminDept, adminStatus, allRisks]);
+    }, [currentUser, adminDept, adminStatus, allRisks, adminDeptOptions]);
 
     // Migrate existing risks from older schema (level -> impact, add likelihood default)
     useEffect(() => {
@@ -530,6 +586,17 @@ const App: React.FC = () => {
                     'operation': 'OP',
                     'facilities': 'FC',
                     'facility': 'FC',
+                    'finance': 'F',
+                    'finance & accounts': 'F',
+                    'finance and accounts': 'F',
+                    'financial services': 'F',
+                    'accounting': 'AC',
+                    'accounts': 'AC',
+                    'purchase': 'P',
+                    'procurement': 'P',
+                    'supply chain': 'SC',
+                    'supply-chain': 'SC',
+                    'pharmacy': 'PH',
                 };
                 
                 // Normalize input: remove extra spaces and convert to lowercase
@@ -569,15 +636,17 @@ const App: React.FC = () => {
                 return 'RS'; // Final fallback
             };
             const normalizedDept = (department || '').trim().toLowerCase();
-            const prefix = derivePrefix(department);
+            const prefix = derivePrefix(department).toUpperCase();
             const currentMax = risks
                 .filter(r => (r.department || '').trim().toLowerCase() === normalizedDept)
                 .map(r => {
                     const riskNoValue = (r.riskNo || '').toString().trim().toUpperCase();
-                    // For 2-letter prefix, extract numeric part starting from position 3 (e.g., "OP001" -> "001")
-                    if (!riskNoValue.startsWith(prefix) || riskNoValue.length < 5) return 0;
-                    const numericPart = riskNoValue.substring(2); // Skip first 2 letters
-                    const parsed = parseInt(numericPart, 10);
+                    if (!riskNoValue.startsWith(prefix)) return 0;
+                    const remainder = riskNoValue.substring(prefix.length);
+                    if (!remainder.length || !/^\d/.test(remainder)) return 0;
+                    const numericMatch = remainder.match(/(\d+)/);
+                    if (!numericMatch) return 0;
+                    const parsed = parseInt(numericMatch[1], 10);
                     return Number.isNaN(parsed) ? 0 : parsed;
                 })
                 .reduce((a, b) => Math.max(a, b), 0);
@@ -977,6 +1046,54 @@ const App: React.FC = () => {
                                     </button>
                                 </div>
                             )}
+                            {currentUser?.role === 'unit_head' && (
+                                <div className="hidden sm:flex items-center gap-3 mr-2">
+                                    <button
+                                        onClick={() => setUnitHeadView('risks')}
+                                        className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                                            unitHeadView === 'risks'
+                                                ? 'bg-brand-primary text-white border-brand-primary'
+                                                : 'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300 hover:bg-base-300 dark:hover:bg-dark-200'
+                                        }`}
+                                    >
+                                        Risks
+                                    </button>
+                                    <button
+                                        onClick={() => setUnitHeadView('reports')}
+                                        className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                                            unitHeadView === 'reports'
+                                                ? 'bg-brand-primary text-white border-brand-primary'
+                                                : 'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300 hover:bg-base-300 dark:hover:bg-dark-200'
+                                        }`}
+                                    >
+                                        Reports
+                                    </button>
+                                </div>
+                            )}
+                            {currentUser?.role === 'user' && (
+                                <div className="hidden sm:flex items-center gap-3 mr-2">
+                                    <button
+                                        onClick={() => setUserView('risks')}
+                                        className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                                            userView === 'risks'
+                                                ? 'bg-brand-primary text-white border-brand-primary'
+                                                : 'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300 hover:bg-base-300 dark:hover:bg-dark-200'
+                                        }`}
+                                    >
+                                        Risks
+                                    </button>
+                                    <button
+                                        onClick={() => setUserView('reports')}
+                                        className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
+                                            userView === 'reports'
+                                                ? 'bg-brand-primary text-white border-brand-primary'
+                                                : 'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300 hover:bg-base-300 dark:hover:bg-dark-200'
+                                        }`}
+                                    >
+                                        Reports
+                                    </button>
+                                </div>
+                            )}
                             <UserSwitcher currentUser={currentUser} />
                             {/* <ThemeToggle /> */}
                             {currentUser && (
@@ -990,8 +1107,8 @@ const App: React.FC = () => {
             </header>
             <main>
                 {!currentUser ? (
-                    <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
-                    // <Login users={users} onLogin={handleLoggedIn} />
+                    // <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
+                    <Login users={users} onLogin={handleLoggedIn} />
                 ) : currentUser.role === 'admin' ? (
                     adminView === 'admin' ? (
                     <AdminDashboard 
@@ -1312,8 +1429,135 @@ const App: React.FC = () => {
                                 />
                             );
                         }
+                        if (currentUser.role === 'unit_head') {
+                            const opsRisks = risks.filter(r => isOperationsDepartment(r.department));
+                            const opsIncidents = incidents.filter(i => opsRisks.some(or => or.id === i.riskId));
+                            const deptOptions = ['All', ...Array.from(new Set(opsRisks.map(r => r.department || DEFAULT_OPERATIONS_LABEL))).filter(Boolean)];
+                            if (unitHeadView === 'reports') {
+                                return (
+                                    <ReportsDashboard
+                                        risks={opsRisks}
+                                        incidents={opsIncidents}
+                                        departments={deptOptions.length ? deptOptions : ['All', DEFAULT_OPERATIONS_LABEL]}
+                                        currentUser={currentUser}
+                                    />
+                                );
+                            }
+                            return (
+                                <RiskDashboard
+                                    risks={opsRisks}
+                                    owners={owners}
+                                    users={users}
+                                    currentUser={currentUser}
+                                    onSaveRisk={handleSaveRisk}
+                                    onDeleteRisk={handleDeleteRisk}
+                                    incidents={opsIncidents}
+                                    incidentHistory={incidentHistory}
+                                    onAddIncident={handleAddIncident}
+                                    onUpdateIncident={handleUpdateIncident}
+                                    aiSummary={aiSummary}
+                                    aiLoading={aiLoading}
+                                    aiIncidentsSummary={aiIncidentsSummary}
+                                    aiIncidentsLoading={aiIncidentsLoading}
+                                    onSetSummaryRiskId={setSummaryRiskId}
+                                    onRefreshSummary={async () => {
+                                        try {
+                                            setAiLoading(true);
+                                            const selectedRisks = summaryRiskId ? opsRisks.filter(r => r.id === summaryRiskId) : opsRisks;
+                                            const selectedRiskIds = new Set(selectedRisks.map(r => r.id));
+                                            const selectedIncidents = opsIncidents.filter(i => selectedRiskIds.has(i.riskId));
+                                            const res = await fetch(apiUrl('/ai/summary'), {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    role: currentUser.role,
+                                                    userName: currentUser.name,
+                                                    department: DEFAULT_OPERATIONS_LABEL,
+                                                    risks: selectedRisks.map(r => ({
+                                                        riskNo: r.riskNo,
+                                                        name: r.name,
+                                                        description: r.description,
+                                                        impact: r.impact,
+                                                        likelihood: r.likelihood,
+                                                        status: r.status,
+                                                        department: r.department,
+                                                    })),
+                                                    incidents: selectedIncidents.map(i => ({
+                                                        riskNo: selectedRisks.find(r => r.id === i.riskId)?.riskNo,
+                                                        summary: i.summary,
+                                                        occurredAt: i.occurredAt,
+                                                        currentStatusText: i.currentStatusText,
+                                                    })),
+                                                }),
+                                            });
+                                            const data = await res.json();
+                                            if (!res.ok) {
+                                                console.error('AI summary API error details:', data);
+                                                throw new Error(data?.error || 'Failed to generate summary');
+                                            }
+                                            setAiSummary(String(data.summary || ''));
+                                        } catch (e) {
+                                            console.error('AI summary refresh failed', e);
+                                        } finally {
+                                            setAiLoading(false);
+                                        }
+                                    }}
+                                    onRefreshIncidentsSummary={async () => {
+                                        try {
+                                            setAiIncidentsLoading(true);
+                                            const res = await fetch(apiUrl('/ai/summary'), {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    role: currentUser.role,
+                                                    userName: currentUser.name,
+                                                    department: DEFAULT_OPERATIONS_LABEL,
+                                                    risks: opsRisks.map(r => ({
+                                                        riskNo: r.riskNo,
+                                                        name: r.name,
+                                                        description: r.description,
+                                                        impact: r.impact,
+                                                        likelihood: r.likelihood,
+                                                        status: r.status,
+                                                        department: r.department,
+                                                    })),
+                                                    incidents: opsIncidents.map(i => ({
+                                                        riskNo: opsRisks.find(r => r.id === i.riskId)?.riskNo,
+                                                        summary: i.summary,
+                                                        occurredAt: i.occurredAt,
+                                                        currentStatusText: i.currentStatusText,
+                                                    })),
+                                                }),
+                                            });
+                                            const data = await res.json();
+                                            if (!res.ok) {
+                                                console.error('AI incidents summary API error details:', data);
+                                                throw new Error(data?.error || 'Failed to generate incidents summary');
+                                            }
+                                            setAiIncidentsSummary(String(data.summary || ''));
+                                        } catch (e) {
+                                            console.error('AI incidents summary refresh failed', e);
+                                        } finally {
+                                            setAiIncidentsLoading(false);
+                                        }
+                                    }}
+                                />
+                            );
+                        }
                         if (currentUser.role === 'user') {
                             const filtered = risks.filter(r => r.createdByUserId === currentUser.id || (currentUser.department && String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase()));
+                            const filteredIncidents = incidents.filter(i => filtered.some(fr => fr.id === i.riskId));
+                            const deptOptions = ['All', ...Array.from(new Set(filtered.map(r => (r.department || '').toString()).filter(Boolean)))];
+                            if (userView === 'reports') {
+                                return (
+                                    <ReportsDashboard
+                                        risks={filtered}
+                                        incidents={filteredIncidents}
+                                        departments={deptOptions.length ? deptOptions : ['All']}
+                                        currentUser={currentUser}
+                                    />
+                                );
+                            }
                             return (
                                 <RiskDashboard 
                                     risks={filtered}
@@ -1322,22 +1566,68 @@ const App: React.FC = () => {
                                     currentUser={currentUser}
                                     onSaveRisk={handleSaveRisk}
                                     onDeleteRisk={handleDeleteRisk}
-                                    incidents={incidents.filter(i => filtered.some(fr => fr.id === i.riskId))}
+                                    incidents={filteredIncidents}
                                     incidentHistory={incidentHistory}
                                     onAddIncident={handleAddIncident}
                                     onUpdateIncident={handleUpdateIncident}
                                     aiSummary={aiSummary}
                                     aiLoading={aiLoading}
+                                    aiIncidentsSummary={aiIncidentsSummary}
+                                    aiIncidentsLoading={aiIncidentsLoading}
+                                    onSetSummaryRiskId={setSummaryRiskId}
                                     onRefreshSummary={async () => {
                                         try {
                                             const dept = currentUser.department || 'All';
                                             setAiLoading(true);
-                                            const res = await fetch('https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.net/api/ai/summary', {
+                                            const selectedRisks = summaryRiskId ? filtered.filter(r => r.id === summaryRiskId) : filtered;
+                                            const selectedRiskIds = new Set(selectedRisks.map(r => r.id));
+                                            const selectedIncidents = filteredIncidents.filter(i => selectedRiskIds.has(i.riskId));
+                                            const res = await fetch(apiUrl('/ai/summary'), {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({
                                                     role: currentUser.role,
-                                                    userName: (currentUser as any).name || (currentUser as any).Name || '',
+                                                    userName: currentUser.name,
+                                                    department: dept,
+                                                    risks: selectedRisks.map(r => ({
+                                                        riskNo: r.riskNo,
+                                                        name: r.name,
+                                                        description: r.description,
+                                                        impact: r.impact,
+                                                        likelihood: r.likelihood,
+                                                        status: r.status,
+                                                        department: r.department,
+                                                    })),
+                                                    incidents: selectedIncidents.map(i => ({
+                                                        riskNo: selectedRisks.find(r => r.id === i.riskId)?.riskNo,
+                                                        summary: i.summary,
+                                                        occurredAt: i.occurredAt,
+                                                        currentStatusText: i.currentStatusText,
+                                                    })),
+                                                })
+                                            });
+                                            const data = await res.json();
+                                            if (!res.ok) {
+                                                console.error('AI summary API error details:', data);
+                                                throw new Error(data?.error || 'Failed to generate summary');
+                                            }
+                                            setAiSummary(String(data.summary || ''));
+                                        } catch (e) {
+                                            console.error('AI summary refresh failed', e);
+                                        } finally {
+                                            setAiLoading(false);
+                                        }
+                                    }}
+                                    onRefreshIncidentsSummary={async () => {
+                                        try {
+                                            const dept = currentUser.department || 'All';
+                                            setAiIncidentsLoading(true);
+                                            const res = await fetch(apiUrl('/ai/summary'), {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                    role: currentUser.role,
+                                                    userName: currentUser.name,
                                                     department: dept,
                                                     risks: filtered.map(r => ({
                                                         riskNo: r.riskNo,
@@ -1347,21 +1637,25 @@ const App: React.FC = () => {
                                                         likelihood: r.likelihood,
                                                         status: r.status,
                                                         department: r.department,
-                                                    }))
-                                                })
+                                                    })),
+                                                    incidents: filteredIncidents.map(i => ({
+                                                        riskNo: filtered.find(r => r.id === i.riskId)?.riskNo,
+                                                        summary: i.summary,
+                                                        occurredAt: i.occurredAt,
+                                                        currentStatusText: i.currentStatusText,
+                                                    })),
+                                                }),
                                             });
                                             const data = await res.json();
                                             if (!res.ok) {
-                                                // eslint-disable-next-line no-console
-                                                console.error('AI summary API error details:', data);
-                                                throw new Error(data?.error || 'Failed to generate summary');
+                                                console.error('AI incidents summary API error details:', data);
+                                                throw new Error(data?.error || 'Failed to generate incidents summary');
                                             }
-                                            setAiSummary(String(data.summary || ''));
+                                            setAiIncidentsSummary(String(data.summary || ''));
                                         } catch (e) {
-                                            // eslint-disable-next-line no-console
-                                            console.error('AI summary refresh failed', e);
+                                            console.error('AI incidents summary refresh failed', e);
                                         } finally {
-                                            setAiLoading(false);
+                                            setAiIncidentsLoading(false);
                                         }
                                     }}
                                 />

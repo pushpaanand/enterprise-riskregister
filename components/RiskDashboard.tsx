@@ -59,6 +59,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [kpiLikelihoodFilter, setKpiLikelihoodFilter] = useState<RiskLikelihood | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [identificationFilter, setIdentificationFilter] = useState<string>('All');
+  const [searchTerm, setSearchTerm] = useState<string>('');
   // Pagination
   const [riskPage, setRiskPage] = useState<number>(1);
   const [riskPageSize, setRiskPageSize] = useState<number>(10);
@@ -128,6 +129,30 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
     if (onSetSummaryRiskId) onSetSummaryRiskId(val === 'ALL' ? null : val);
   };
 
+  const filterInputStyles = "rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content";
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const matchesSearch = (risk: Risk) => {
+    if (!normalizedSearch) return true;
+    const haystack = [
+      risk.riskNo,
+      risk.description,
+      risk.category,
+      (risk as any).existingControlInPlace,
+      (risk as any).planOfAction,
+      (risk as any).identification,
+      (risk as any).riskIndicator,
+      risk.department,
+      risk.status,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return haystack.includes(normalizedSearch);
+  };
+
+  const availableDeptOptions = adminDeptOptions && adminDeptOptions.length > 0 ? adminDeptOptions : ['All'];
+  const selectedAdminDept = adminDept && availableDeptOptions.includes(adminDept) ? adminDept : availableDeptOptions[0];
+
   return (
     <div className="mx-auto max-w-[1800px] px-4 sm:px-6 lg:px-8 py-8">
       <div className="sm:flex sm:items-center sm:justify-between">
@@ -159,7 +184,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               {showSummary ? 'Hide Summary' : 'Show Summary'}
             </button>
           )}
-          {activeTab !== 'incidents' && (currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+          {activeTab !== 'incidents' && (currentUser && ['manager','admin','unit_head','user'].includes(currentUser.role)) && (
             <button
               type="button"
               onClick={() => setShowMatrix(m => !m)}
@@ -270,7 +295,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
         </>
       )}
 
-      {activeTab !== 'incidents' && showMatrix && (currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+      {activeTab !== 'incidents' && showMatrix && (currentUser && ['manager','admin','unit_head','user'].includes(currentUser.role)) && (
         <div className="mt-8 bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
           <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content">Risk Matrix</h3>
           <p className="mt-2 text-sm text-base-content-muted dark:text-dark-content-muted">Counts by Impact × Likelihood</p>
@@ -287,13 +312,13 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       {activeTab === 'risks' ? (
         <div className="mt-8">
           {/* Filters */}
-          <div className="mb-3 flex flex-wrap items-center gap-3">
+      <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-sm text-base-content dark:text-dark-content">Status</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+            className={filterInputStyles}
               >
                 {['All','New','Existing','Downgraded','Upgraded','Eliminated','Open','Closed','In Progress'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
@@ -305,13 +330,37 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
-                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+            className={filterInputStyles}
               >
                 {['All','Inherent','Residual'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
             </div>
+        {currentUser?.role === 'admin' && (
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-base-content dark:text-dark-content">Department</label>
+            <select
+              value={selectedAdminDept}
+              onChange={(e) => onChangeAdminDept && onChangeAdminDept(e.target.value)}
+              className={filterInputStyles}
+            >
+              {availableDeptOptions.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+          <label className="text-sm text-base-content dark:text-dark-content">Search</label>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setRiskPage(1); setNewRiskPage(1); setPendingPage(1); setRejectedPage(1); }}
+            placeholder="Search by ID, description, category..."
+            className={filterInputStyles + ' flex-1'}
+          />
+        </div>
           </div>
           {(() => {
             // Apply admin-level dept filter first, and exclude rejected and raised risks (raised risks are shown in Pending Action tab)
@@ -319,7 +368,10 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             if (currentUser?.role === 'admin') {
               if (adminDept && adminDept !== 'All') base = base.filter(r => String(r.department || '') === adminDept);
             }
-            const filtered = base.filter(r => (statusFilter==='All' || r.status === statusFilter) && (identificationFilter==='All' || (r as any).identification === identificationFilter));
+        const filtered = base
+          .filter(r => (statusFilter==='All' || r.status === statusFilter))
+          .filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter))
+          .filter(matchesSearch);
             const total = filtered.length;
             const start = (riskPage - 1) * riskPageSize;
             const pageItems = filtered.slice(start, start + riskPageSize);
@@ -374,12 +426,36 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
-                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+                className={filterInputStyles}
               >
                 {['All','Inherent risk','Residual risk'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
+            </div>
+            {currentUser?.role === 'admin' && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-base-content dark:text-dark-content">Department</label>
+                <select
+                  value={selectedAdminDept}
+                  onChange={(e) => onChangeAdminDept && onChangeAdminDept(e.target.value)}
+                  className={filterInputStyles}
+                >
+                  {availableDeptOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+              <label className="text-sm text-base-content dark:text-dark-content">Search</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setNewRiskPage(1); }}
+                placeholder="Search by ID, description, category..."
+                className={filterInputStyles + ' flex-1'}
+              />
             </div>
           </div>
           {(() => {
@@ -388,7 +464,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
               base = base.filter(r => String(r.department || '') === adminDept);
             }
-            const filtered = base.filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter));
+            const filtered = base
+              .filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter))
+              .filter(matchesSearch);
             const total = filtered.length;
             const start = (newRiskPage - 1) * riskPageSize;
             const pageItems = filtered.slice(start, start + riskPageSize);
@@ -445,12 +523,36 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
-                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+                className={filterInputStyles}
               >
                 {['All','Inherent risk','Residual risk'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
+            </div>
+            {currentUser?.role === 'admin' && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-base-content dark:text-dark-content">Department</label>
+                <select
+                  value={selectedAdminDept}
+                  onChange={(e) => onChangeAdminDept && onChangeAdminDept(e.target.value)}
+                  className={filterInputStyles}
+                >
+                  {availableDeptOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+              <label className="text-sm text-base-content dark:text-dark-content">Search</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setPendingPage(1); }}
+                placeholder="Search by ID, description, category..."
+                className={filterInputStyles + ' flex-1'}
+              />
             </div>
           </div>
           {(() => {
@@ -459,7 +561,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
               base = base.filter(r => String(r.department || '') === adminDept);
             }
-            const filtered = base.filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter));
+            const filtered = base
+              .filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter))
+              .filter(matchesSearch);
             const total = filtered.length;
             const start = (pendingPage - 1) * riskPageSize;
             const pageItems = filtered.slice(start, start + riskPageSize);
@@ -516,12 +620,36 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
-                className="rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-1.5 text-sm text-base-content dark:text-dark-content"
+                className={filterInputStyles}
               >
                 {['All','Inherent risk','Residual risk'].map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
+            </div>
+            {currentUser?.role === 'admin' && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-base-content dark:text-dark-content">Department</label>
+                <select
+                  value={selectedAdminDept}
+                  onChange={(e) => onChangeAdminDept && onChangeAdminDept(e.target.value)}
+                  className={filterInputStyles}
+                >
+                  {availableDeptOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+              <label className="text-sm text-base-content dark:text-dark-content">Search</label>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setRejectedPage(1); }}
+                placeholder="Search by ID, description, category..."
+                className={filterInputStyles + ' flex-1'}
+              />
             </div>
           </div>
           {(() => {
@@ -530,7 +658,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') {
               base = base.filter(r => String(r.department || '') === adminDept);
             }
-            const filtered = base.filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter));
+            const filtered = base
+              .filter(r => (identificationFilter==='All' || (r as any).identification === identificationFilter))
+              .filter(matchesSearch);
             const total = filtered.length;
             const start = (rejectedPage - 1) * riskPageSize;
             const pageItems = filtered.slice(start, start + riskPageSize);

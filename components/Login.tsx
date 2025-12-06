@@ -9,7 +9,7 @@ interface LoginProps {
 
 const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'user' | 'manager' | 'admin'>('user');
+  const [role, setRole] = useState<'user' | 'manager' | 'admin' | 'unit_head'>('user');
   const [department, setDepartment] = useState('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -34,7 +34,7 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
       const selectedUser: User = {
         id: apiUser.UserId,
         name: apiUser.Name,
-        role: apiUser.Role as 'user' | 'manager' | 'admin',
+        role: apiUser.Role as 'user' | 'manager' | 'admin' | 'unit_head',
         department: apiUser.Department || department || undefined,
       };
       localStorage.setItem('currentUserId', selectedUser.id);
@@ -50,9 +50,9 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
     }
   };
 
-  const quickLogin = async (target: 'admin' | 'user' | 'manager') => {
+  const quickLogin = async (target: 'admin' | 'user' | 'manager' | 'unit_head') => {
     setRole(target);
-    setName(target === 'admin' ? 'Alex' : target === 'manager' ? 'Maya' : 'Sam');
+    setName(target === 'admin' ? 'Alex' : target === 'manager' ? 'Maya' : target === 'unit_head' ? 'John' : 'Sam');
     if (target !== 'admin' && !department) setDepartment('Engineering');
   };
 
@@ -70,10 +70,11 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
           </div>
           <div>
             <label htmlFor="role" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Role</label>
-            <select id="role" value={role} onChange={(e) => setRole(e.target.value as 'user' | 'manager' | 'admin')} className={selectStyles + ' mt-2'}>
+            <select id="role" value={role} onChange={(e) => setRole(e.target.value as 'user' | 'manager' | 'admin' | 'unit_head')} className={selectStyles + ' mt-2'}>
               <option value="user">User</option>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
+              <option value="unit_head">Unit Head</option>
             </select>
           </div>
           {role !== 'admin' && (
@@ -89,6 +90,7 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
           <button onClick={() => quickLogin('user')} className="rounded-md bg-base-300 dark:bg-dark-300 px-3 py-2 text-sm font-semibold text-base-content dark:text-dark-content hover:bg-base-300/70">Demo User</button>
           <button onClick={() => quickLogin('manager')} className="rounded-md bg-base-300 dark:bg-dark-300 px-3 py-2 text-sm font-semibold text-base-content dark:text-dark-content hover:bg-base-300/70">Demo Manager</button>
           <button onClick={() => quickLogin('admin')} className="rounded-md bg-base-300 dark:bg-dark-300 px-3 py-2 text-sm font-semibold text-base-content dark:text-dark-content hover:bg-base-300/70">Demo Admin</button>
+          <button onClick={() => quickLogin('unit_head')} className="rounded-md bg-base-300 dark:bg-dark-300 px-3 py-2 text-sm font-semibold text-base-content dark:text-dark-content hover:bg-base-300/70">Demo Unit Head</button>
         </div>
       </div>
     </div>

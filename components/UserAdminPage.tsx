@@ -3,6 +3,22 @@ import { User } from '../types';
 import { PlusIcon, TrashIcon } from '../constants';
 import { apiUrl } from '../api';
 
+
+const unitOptions = [
+  { code: 'KCH', name: 'Kauvery Hospital, Chennai (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KVP', name: 'Kauvery Hospital, Vadapalani (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KRR', name: 'Kauvery Hospital, Kovilambakkam (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KHC', name: 'Kauvery Hospital, Heartcity, Trichy (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KTN', name: 'Kauvery Hospital, Tennur, Trichy (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KSM', name: 'Kauvery Hospital, Salem (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KTV', name: 'Kauvery Hospital, Tirunelveli (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KHO', name: 'Kauvery Hospital, Hosur (A Unit Of Sri Kauvery Medical Care India Limited)' },
+  { code: 'KEC', name: 'Sri Kauvery Medical Care India Limited (Electronic City)' },
+  { code: 'KMH', name: 'Sri Kauvery Medical Care India Limited (Marathahalli)' },
+  { code: 'KCN', name: 'KMC Specialty Hospitals India Limited - Cantonment, Trichy' },
+  { code: 'KMC', name: 'MAA Kauvery (A Unit of KMC Specialty Hospitals India Limited - Trichy)' },
+];
+
 interface UserAdminPageProps {
   users: User[];
   onAddUser: (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
@@ -204,7 +220,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
               </select>
             </div>
           )}
-          <div className="flex-grow min-w-[160px]">
+          <div className="flex-grow min-w-[240px]">
             <label htmlFor="new-user-unit" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Unit</label>
             <select
               id="new-user-unit"
@@ -213,9 +229,11 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
               className={selectStyles + ' mt-1'}
             >
               <option value="">Select Unit</option>
-              <option value="KCN">KCN</option>
-              <option value="KTN">KTN</option>
-              <option value="KCH">KCH</option>
+              {unitOptions.map((unit) => (
+                <option key={unit.code} value={unit.code} title={unit.name}>
+                  {unit.code}
+                </option>
+              ))}
             </select>
           </div>
           <div className="flex items-center gap-2 min-w-[140px]">
@@ -273,13 +291,15 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
                       </select>
                     </div>
                   )}
-                  <div className="min-w-[160px]">
+                  <div className="min-w-[240px]">
                     <label className="block text-xs font-medium leading-6 text-base-content dark:text-dark-content">Unit</label>
                     <select className={selectStyles + ' mt-1'} value={editUnit} onChange={(e) => setEditUnit(e.target.value)}>
                       <option value="">Select Unit</option>
-                      <option value="KCN">KCN</option>
-                      <option value="KTN">KTN</option>
-                      <option value="KCH">KCH</option>
+                      {unitOptions.map((unit) => (
+                        <option key={unit.code} value={unit.code} title={unit.name}>
+                          {unit.code}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div className="flex items-center gap-2">

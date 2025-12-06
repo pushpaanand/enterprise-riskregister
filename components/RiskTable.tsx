@@ -52,7 +52,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
     return getOwnerName(risk.ownerId);
   };
 
-  const baseColumns = 12; // Risk ID, Category, Description, Department, Identification, Existing Control, Plan of Action, Risk Indicator, Impact, Likelihood, Stage, Raised By, History, Last Updated
+  const baseColumns = 14; // Risk ID, Category, Description, Impact, Likelihood, Identification, KRI, Department, Existing Control, Plan of Action, Stage, Raised By, History, Last Updated
   const userHasRowActions = currentUser?.role === 'user' && risks.some(r => r.createdByUserId === currentUser?.id);
   const showActions = Boolean(currentUser?.role === 'manager' || userHasRowActions);
   const totalColumns = showActions ? baseColumns + 1 : baseColumns;
@@ -65,17 +65,17 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
             <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-brand-primary sm:pl-6 w-32">Risk ID</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary w-48">Category</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary min-w-[300px]">Risk Description</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Department</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Identification</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Existing Control</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Plan of Action</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Impact</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Likelihood</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Identification</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">KRI</th>            
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Existing Control</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Plan of Action</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Stage</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Raised By</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">History</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Raised By</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Last Updated</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Risk Indicator</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Department</th>
             {showActions && (
                 <th scope="col" className="py-3.5 pl-3 pr-4 text-left text-sm font-semibold text-brand-primary sm:pr-6 w-40">Actions</th>
             )}
@@ -89,14 +89,14 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
               <td className="whitespace-normal px-3 py-4 text-sm">
                 <div className="text-base-content dark:text-dark-content break-words max-w-none">{risk.description}</div>
               </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.department || '-'}</td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.identification || '-'}</td>
-              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.existingControlInPlace || '-'}</td>
-              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.planOfAction || '-'}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm">
                 <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${impactColorMap[risk.impact] || impactColorMap['Moderate']}`}>{risk.impact || 'Moderate'}</span>
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.likelihood || 'Possible'}</td>
+              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.identification || '-'}</td>
+              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.riskIndicator || '-'}</td>              
+              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.existingControlInPlace || '-'}</td>
+              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.planOfAction || '-'}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm">
                 <div className="flex flex-col gap-1">
                   <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ${statusColorMap[risk.status] || 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'}`}>{risk.status}</span>
@@ -106,8 +106,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
                     </span>
                   )}
                 </div>
-              </td>
-              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{getRaisedBy(risk)}</td>
+              </td>              
               <td className="whitespace-nowrap px-3 py-4 text-sm">
                 <div className="flex items-center gap-3">
                   <button
@@ -134,8 +133,9 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
                   </button>
                 </div>
               </td>
+              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{getRaisedBy(risk)}</td>
               <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content-muted dark:text-dark-content-muted">{new Date(risk.updatedAt).toLocaleDateString()}</td>
-              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.riskIndicator || '-'}</td>
+              <td className="whitespace-nowrap px-3 py-4 text-sm text-base-content dark:text-dark-content">{risk.department || '-'}</td>
               {showActions && (
                 <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 w-40" onClick={(e) => e.stopPropagation()}>
                   {currentUser?.role === 'manager' && (
