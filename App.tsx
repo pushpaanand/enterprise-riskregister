@@ -1107,8 +1107,8 @@ const App: React.FC = () => {
             </header>
             <main>
                 {!currentUser ? (
-                    // <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
-                    <Login users={users} onLogin={handleLoggedIn} />
+                    <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
+                    // <Login users={users} onLogin={handleLoggedIn} />
                 ) : currentUser.role === 'admin' ? (
                     adminView === 'admin' ? (
                     <AdminDashboard 
