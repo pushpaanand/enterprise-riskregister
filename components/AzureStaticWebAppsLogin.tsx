@@ -27,10 +27,40 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     init();
   }, []);
 
+  const clearBrowserCaches = async () => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.clear();
+    } catch (storageErr) {
+      console.warn('Unable to clear localStorage during logout', storageErr);
+    }
+    try {
+      sessionStorage.clear();
+    } catch (storageErr) {
+      console.warn('Unable to clear sessionStorage during logout', storageErr);
+    }
+    if ('caches' in window) {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      } catch (cacheErr) {
+        console.warn('Unable to clear CacheStorage during logout', cacheErr);
+      }
+    }
+  };
+
   const checkAuth = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/.auth/me', { credentials: 'include' });
+      const cacheBuster = Date.now();
+      const res = await fetch(`/.auth/me?ts=${cacheBuster}`, {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
       if (!res.ok) {
         setAzureUser(null);
         setLoading(false);
@@ -60,10 +90,9 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     window.location.href = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setError('');
-    localStorage.removeItem('currentUserId');
-    localStorage.removeItem('azureUser');
+    await clearBrowserCaches();
     setAzureUser(null);
     const homePageUrl = window.location.origin;
     window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}`;
