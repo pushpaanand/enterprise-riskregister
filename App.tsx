@@ -547,12 +547,29 @@ const App: React.FC = () => {
         }
       };
 
+    // const handleLogout = async () => {
+    //     await clearBrowserCaches();
+    //     const origin = window.location.origin;
+    //     const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
+    //     window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
+    // };
     const handleLogout = async () => {
-        await clearBrowserCaches();
-        const origin = window.location.origin;
-        const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
-        window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
-    };
+        try {
+          // Step 1: Logout from Azure Static Web App session
+          await fetch("/.auth/logout", { method: "GET", credentials: "include" });
+      
+          // Step 2: Force logout from Azure AD completely
+          const origin = window.location.origin;
+          const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
+      
+          // Redirect to Azure AD logout
+          window.location.href = aadLogout;
+      
+        } catch (error) {
+          console.error("Logout error:", error);
+        }
+      };
+      
 
     // Risk CRUD
     const handleSaveRisk = async (riskData: Omit<Risk, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
