@@ -550,12 +550,9 @@ const App: React.FC = () => {
     const handleLogout = async () => {
         await clearBrowserCaches();
         const origin = window.location.origin;
-        // First, clear the Static Web Apps session
-        await fetch(`/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`, { credentials: 'include' });
-        // Then, clear the Microsoft Entra SSO session
-        const aadLogout = 'https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout';
-        window.location.href = `${aadLogout}?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
-      };
+        const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
+        window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
+    };
 
     // Risk CRUD
     const handleSaveRisk = async (riskData: Omit<Risk, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
