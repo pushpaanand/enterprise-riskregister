@@ -87,7 +87,11 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   const handleLogin = () => {
     setError('');
     const redirectUri = window.location.origin;
-    window.location.href = `/.auth/login/aad?post_login_redirect_uri=${encodeURIComponent(redirectUri)}`;
+    const loginUrl = new URL(`/.auth/login/aad`, window.location.origin);
+    loginUrl.searchParams.set('post_login_redirect_uri', redirectUri);
+    loginUrl.searchParams.set('prompt', 'login');
+    loginUrl.searchParams.set('max_age', '0');
+    window.location.href = loginUrl.toString();
   };
 
   const handleLogout = async () => {
