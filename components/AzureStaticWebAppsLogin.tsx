@@ -98,8 +98,9 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     setError('');
     await clearBrowserCaches();
     setAzureUser(null);
-    const homePageUrl = window.location.origin;
-    window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}`;
+    const origin = window.location.origin;
+    const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
+    window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
   };
 
   const handleAzureLogin = async (principal: AzureUser) => {
@@ -189,8 +190,11 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
               disabled={loading}
               className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 0C4.477 0 0 4.477 0 10s4.477 10 10 10 10-4.477 10-10S15.523 0 10 0zm4.5 5.5c.276 0 .5.224.5.5s-.224.5-.5.5-.5-.224-.5-.5.224-.5.5-.5zm-9 0c.276 0 .5.224.5.5s-.224.5-.5.5-.5-.224-.5-.5.224-.5.5-.5zM10 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z"/>
+              <svg className="w-5 h-5" viewBox="0 0 16 16" aria-hidden="true">
+                <rect width="7" height="7" x="0" y="0" fill="#F35325" />
+                <rect width="7" height="7" x="9" y="0" fill="#81BC06" />
+                <rect width="7" height="7" x="0" y="9" fill="#05A6F0" />
+                <rect width="7" height="7" x="9" y="9" fill="#FFBA08" />
               </svg>
               {loading ? 'Signing in...' : 'Sign in with Microsoft'}
             </button>
