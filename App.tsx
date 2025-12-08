@@ -488,43 +488,74 @@ const App: React.FC = () => {
         }
     }, [pendingLinkAction, currentUser]);
 
-    const handleLogout = () => {
-        // Get currentUserId before clearing
-        const currentUserIdToRemove = currentUser?.id || localStorage.getItem('currentUserId');
+    // const handleLogout = () => {
+    //     // Get currentUserId before clearing
+    //     const currentUserIdToRemove = currentUser?.id || localStorage.getItem('currentUserId');
         
-        // Clear ALL authentication-related localStorage data BEFORE logout
-        // This prevents auto-login when the page reloads after redirect
-        localStorage.removeItem('currentUserId');
-        localStorage.removeItem('azureUser');
+    //     // Clear ALL authentication-related localStorage data BEFORE logout
+    //     // This prevents auto-login when the page reloads after redirect
+    //     localStorage.removeItem('currentUserId');
+    //     localStorage.removeItem('azureUser');
         
-        // Clear users array completely or remove only the current user
-        if (currentUserIdToRemove) {
-            const users = JSON.parse(localStorage.getItem('users') || '[]');
-            const updatedUsers = users.filter((u: User) => u.id !== currentUserIdToRemove);
-            localStorage.setItem('users', JSON.stringify(updatedUsers));
-        } else {
-            // If no currentUserId, clear all users to be safe
-            localStorage.setItem('users', JSON.stringify([]));
+    //     // Clear users array completely or remove only the current user
+    //     if (currentUserIdToRemove) {
+    //         const users = JSON.parse(localStorage.getItem('users') || '[]');
+    //         const updatedUsers = users.filter((u: User) => u.id !== currentUserIdToRemove);
+    //         localStorage.setItem('users', JSON.stringify(updatedUsers));
+    //     } else {
+    //         // If no currentUserId, clear all users to be safe
+    //         localStorage.setItem('users', JSON.stringify([]));
+    //     }
+        
+    //     // Mark that user explicitly logged out - prevents auto-login
+    //     // This flag MUST persist until user explicitly clicks sign in
+    //     sessionStorage.setItem('userLoggedOut', 'true');
+        
+    //     // Clear any login in progress flags
+    //     sessionStorage.removeItem('azureLoginInProgress');
+        
+    //     // Clear state immediately
+    //     setCurrentUser(null);
+    //     setAdminView('risks');
+    //     setManagerView('risks');
+        
+    //     // Always redirect to Azure logout (even if not Azure user, to be safe)
+    //     // This ensures Azure session is cleared if it exists
+    //     const homePageUrl = window.location.origin;
+    //     const timestamp = new Date().getTime();
+    //     window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}&_=${timestamp}`;
+    // };
+    const clearBrowserCaches = async () => {
+        if (typeof window === 'undefined') return;
+        try {
+          localStorage.clear();
+        } catch (storageErr) {
+          console.warn('Unable to clear localStorage during logout', storageErr);
         }
-        
-        // Mark that user explicitly logged out - prevents auto-login
-        // This flag MUST persist until user explicitly clicks sign in
-        sessionStorage.setItem('userLoggedOut', 'true');
-        
-        // Clear any login in progress flags
-        sessionStorage.removeItem('azureLoginInProgress');
-        
-        // Clear state immediately
-        setCurrentUser(null);
-        setAdminView('risks');
-        setManagerView('risks');
-        
-        // Always redirect to Azure logout (even if not Azure user, to be safe)
-        // This ensures Azure session is cleared if it exists
-        const homePageUrl = window.location.origin;
-        const timestamp = new Date().getTime();
-        window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(homePageUrl)}&_=${timestamp}`;
-    };
+        try {
+          sessionStorage.clear();
+        } catch (storageErr) {
+          console.warn('Unable to clear sessionStorage during logout', storageErr);
+        }
+        if ('caches' in window) {
+          try {
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+          } catch (cacheErr) {
+            console.warn('Unable to clear CacheStorage during logout', cacheErr);
+          }
+        }
+      };
+
+    const handleLogout = async () => {
+        await clearBrowserCaches();
+        const origin = window.location.origin;
+        // First, clear the Static Web Apps session
+        await fetch(`/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`, { credentials: 'include' });
+        // Then, clear the Microsoft Entra SSO session
+        const aadLogout = 'https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout';
+        window.location.href = `${aadLogout}?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
+      };
 
     // Risk CRUD
     const handleSaveRisk = async (riskData: Omit<Risk, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
