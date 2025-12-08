@@ -219,7 +219,7 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ risks, incidents, d
   const onExportRisksPDF = async () => {
     const jsPDF = await getJsPDF();
     await ensureAutoTable();
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
     const head = [selectedRiskColsList.map(c => c.label)];
     const rows = filteredRisks
       .filter(r => selectedRiskRows[r.id])
@@ -240,11 +240,26 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ risks, incidents, d
         };
         return selectedRiskColsList.map(c => String(row[c.key] ?? ''));
       });
+    const riskColumnStyles = selectedRiskColsList.reduce<Record<number, any>>((acc, col, idx) => {
+      if (col.key === 'riskNo') {
+        acc[idx] = { cellWidth: 40 };
+      } else if (['impact', 'likelihood', 'status', 'updatedAt', 'category', 'department'].includes(col.key)) {
+        acc[idx] = { cellWidth: 80 };
+      } else if (['description', 'existingControlInPlace', 'planOfAction', 'riskIndicator', 'identification'].includes(col.key)) {
+        acc[idx] = { cellWidth: 80 };
+      } else {
+        acc[idx] = { cellWidth: 80 };
+      }
+      return acc;
+    }, {});
     (doc as any).autoTable({
       head,
       body: rows,
       startY: 40,
-      styles: { fontSize: 9, cellPadding: 4 },
+      styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+      bodyStyles: { valign: 'top', lineWidth: 0.5, lineColor: [230, 230, 230] },
+      tableWidth: 'auto',
+      columnStyles: riskColumnStyles,
       headStyles: { fillColor: [244, 244, 244], textColor: 20 },
       margin: { left: 24, right: 24 },
       didDrawPage: (data: any) => {
@@ -258,7 +273,7 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ risks, incidents, d
   const onExportIncidentsPDF = async () => {
     const jsPDF = await getJsPDF();
     await ensureAutoTable();
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
     const head = [selectedIncidentColsList.map(c => c.label)];
     const body = filteredIncidents
       .filter(i => selectedIncidentRows[i.id])
@@ -274,11 +289,24 @@ const ReportsDashboard: React.FC<ReportsDashboardProps> = ({ risks, incidents, d
         };
         return selectedIncidentColsList.map(c => String(row[c.key] ?? ''));
       });
+    const incidentColumnStyles = selectedIncidentColsList.reduce<Record<number, any>>((acc, col, idx) => {
+      if (col.key === 'riskNo' || col.key === 'occurredAt' || col.key === 'closedDate') {
+        acc[idx] = { cellWidth: 'auto' };
+      } else if (['summary', 'description', 'mitigationSteps', 'currentStatusText'].includes(col.key)) {
+        acc[idx] = { cellWidth: 220 };
+      } else {
+        acc[idx] = { cellWidth: 140 };
+      }
+      return acc;
+    }, {});
     (doc as any).autoTable({
       head,
       body,
       startY: 40,
-      styles: { fontSize: 9, cellPadding: 4 },
+      styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak' },
+      bodyStyles: { valign: 'top', lineWidth: 0.5, lineColor: [230, 230, 230] },
+      tableWidth: 'auto',
+      columnStyles: incidentColumnStyles,
       headStyles: { fillColor: [244, 244, 244], textColor: 20 },
       margin: { left: 24, right: 24 },
       didDrawPage: (data: any) => {
