@@ -72,10 +72,23 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   };
 
   const handleLogin = () => {
-    setError('');
     const instance = msalInstanceRef.current;
     if (!instance) return;
+    setError('');
+
+    if (instance.getActiveAccount()) {
+      finalizeLogin(instance.getActiveAccount() as AccountInfo);
+      return;
+    }
+
+    setLoading(true);
     instance.loginRedirect(loginRequest).catch(err => {
+      if (err?.errorCode === 'interaction_in_progress') {
+        // Ignore duplicate clicks while redirect is in progress
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
       setError(String(err?.message ?? err));
     });
   };
@@ -107,8 +120,8 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
           azureId: azureId,
           email: azureEmail,
           name: azureName,
-          identityProvider: principal.identityProvider,
-          roles: principal.userRoles || [],
+          identityProvider: principal.environment || 'aad',
+          roles: [],
         }),
       });
 
@@ -138,8 +151,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       onLogin(selectedUser);
     } catch (err: any) {
       setError(String(err?.message ?? err));
-      setAzureUser(null);
-    } finally {
+      setAccount(null);
       setLoading(false);
     }
   };
