@@ -1,29 +1,51 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { PublicClientApplication, AccountInfo } from '@azure/msal-browser';
 import { User } from '../types';
 import { apiUrl } from '../api';
+import { msalConfig, loginRequest } from '../msalConfig';
 
 interface AzureStaticWebAppsLoginProps {
   users: User[];
   onLogin: (user: User) => void;
 }
 
-interface AzureUser {
-  identityProvider: string;
-  userId: string;
-  userDetails: string;
-  userRoles: string[];
-}
-
 const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users: _users, onLogin }) => {
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
-  const [azureUser, setAzureUser] = useState<AzureUser | null>(null);
+  const [account, setAccount] = useState<AccountInfo | null>(null);
+  const msalInstanceRef = useRef<PublicClientApplication | null>(null);
 
-  // Check if user is already authenticated
   useEffect(() => {
     const init = async () => {
-      await checkAuth();
+      try {
+        setLoading(true);
+        const instance = new PublicClientApplication(msalConfig);
+        msalInstanceRef.current = instance;
+        if ((instance as any).initialize) {
+          await (instance as any).initialize();
+        }
+
+        const redirectResponse = await instance.handleRedirectPromise();
+        const activeAccount =
+          redirectResponse?.account ||
+          instance.getActiveAccount() ||
+          instance.getAllAccounts()[0];
+
+        if (!activeAccount) {
+          setAccount(null);
+          setLoading(false);
+          return;
+        }
+
+        instance.setActiveAccount(activeAccount);
+        await finalizeLogin(activeAccount);
+      } catch (err: any) {
+        console.error('MSAL init failed', err);
+        setError('Unable to initialize authentication.');
+        setLoading(false);
+      }
     };
+
     init();
   }, []);
 
@@ -49,72 +71,35 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     }
   };
 
-  const checkAuth = async () => {
-    try {
-      setLoading(true);
-      const cacheBuster = Date.now();
-      const res = await fetch(`/.auth/me?ts=${cacheBuster}`, {
-        credentials: 'include',
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          Pragma: 'no-cache',
-        },
-      });
-      if (!res.ok) {
-        setAzureUser(null);
-        setLoading(false);
-        return;
-      }
-
-      const data = await res.json();
-      const principal = data?.clientPrincipal;
-
-      if (principal) {
-        await handleAzureLogin(principal);
-      } else {
-        setAzureUser(null);
-        setLoading(false);
-      }
-    } catch (err: any) {
-      console.error('Auth check failed:', err);
-      setAzureUser(null);
-      setError('Unable to verify Azure authentication. Please try signing in again.');
-      setLoading(false);
-    }
-  };
-
   const handleLogin = () => {
     setError('');
-    const redirectUri = window.location.origin;
-    const loginUrl = new URL(`/.auth/login/aad`, window.location.origin);
-    loginUrl.searchParams.set('post_login_redirect_uri', redirectUri);
-    loginUrl.searchParams.set('prompt', 'login');
-    loginUrl.searchParams.set('max_age', '0');
-    window.location.href = loginUrl.toString();
+    const instance = msalInstanceRef.current;
+    if (!instance) return;
+    instance.loginRedirect(loginRequest).catch(err => {
+      setError(String(err?.message ?? err));
+    });
   };
 
   const handleLogout = async () => {
     setError('');
     await clearBrowserCaches();
-    setAzureUser(null);
-    const origin = window.location.origin;
-    const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
-    window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
+    setAccount(null);
+    const instance = msalInstanceRef.current;
+    if (!instance) return;
+    instance
+      .logoutRedirect({ account: instance.getActiveAccount() || undefined, postLogoutRedirectUri: window.location.origin })
+      .catch(err => setError(String(err?.message ?? err)));
   };
 
-  const handleAzureLogin = async (principal: AzureUser) => {
+  const finalizeLogin = async (principal: AccountInfo) => {
     setLoading(true);
     setError('');
     try {
-      setAzureUser(principal);
-      // Extract user information from Azure AD
-      const azureName = principal.userDetails || principal.userId || '';
-      const azureEmail = principal.userDetails || '';
-      const azureId = principal.userId || '';
+      setAccount(principal);
+      const azureName = principal.name || principal.username || '';
+      const azureEmail = principal.username || '';
+      const azureId = principal.homeAccountId || principal.localAccountId || '';
 
-      // Map Azure AD user to your database user
-      // Call your backend API to get or create user
       const res = await fetch(apiUrl('/auth/azure-login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -182,7 +167,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
           </div>
         )}
 
-        {!azureUser ? (
+        {!account ? (
           <div className="space-y-4">
             <button
               type="button"
@@ -206,13 +191,11 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
           <div className="space-y-4">
             <div className="p-4 bg-green-50 dark:bg-green-900 rounded">
               <p className="text-sm text-green-800 dark:text-green-200">
-                Signed in as: <strong>{azureUser.userDetails || azureUser.userId}</strong>
+                Signed in as: <strong>{account.name || account.username}</strong>
               </p>
-              {azureUser.userRoles && azureUser.userRoles.length > 0 && (
-                <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                  Roles: {azureUser.userRoles.join(', ')}
-                </p>
-              )}
+              <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                {account.username}
+              </p>
             </div>
             <button
               onClick={handleLogout}
