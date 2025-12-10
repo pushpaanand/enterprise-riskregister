@@ -45,15 +45,35 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         department: apiUser.Department || undefined,
         email: apiUser.Email || undefined,
         employeeId: apiUser.EmployeeId || undefined,
+        unit: apiUser.Unit || undefined,
+        isUnitHead: Boolean(apiUser.IsUnitHead),
       };
 
+      // Store all user data in localStorage (similar to sample code)
       localStorage.setItem('currentUserId', selectedUser.id);
+      localStorage.setItem('userRole', selectedUser.role);
+      localStorage.setItem('userName', selectedUser.name);
+      if (selectedUser.email) {
+        localStorage.setItem('email', selectedUser.email);
+      }
+      if (selectedUser.employeeId) {
+        localStorage.setItem('employeeId', selectedUser.employeeId);
+      }
+      if (selectedUser.unit) {
+        localStorage.setItem('unit_code', selectedUser.unit);
+      }
+      if (selectedUser.department) {
+        localStorage.setItem('department', selectedUser.department);
+      }
+      localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('azureUser', JSON.stringify(principal));
+      
+      // Store in users array for App.tsx
       const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
       const updated = [selectedUser, ...existingUsers.filter(u => u.id !== selectedUser.id)];
       localStorage.setItem('users', JSON.stringify(updated));
       
-      // Call onLogin - parent will update and this component will unmount
+      // Call onLogin - parent will update and route based on role
       onLogin(selectedUser);
     } catch (err: any) {
       console.error('Failed to finalize login:', err);
@@ -83,11 +103,23 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     if (!instance) return;
     
     try {
-      localStorage.removeItem('currentUserId');
-      localStorage.removeItem('azureUser');
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      // Get currentUserId before clearing
       const currentUserId = localStorage.getItem('currentUserId');
+      
+      // Clear all authentication-related localStorage items
+      localStorage.removeItem('currentUserId');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('email');
+      localStorage.removeItem('employeeId');
+      localStorage.removeItem('unit_code');
+      localStorage.removeItem('department');
+      localStorage.removeItem('isAuthenticated');
+      localStorage.removeItem('azureUser');
+      
+      // Clear user from users array
       if (currentUserId) {
+        const users = JSON.parse(localStorage.getItem('users') || '[]');
         localStorage.setItem('users', JSON.stringify(users.filter((u: User) => u.id !== currentUserId)));
       }
     } catch (err) {
@@ -126,6 +158,19 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         } else {
           // No account found - check if user is already logged in via localStorage
           const currentUserId = localStorage.getItem('currentUserId');
+          const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+          
+          if (currentUserId && isAuthenticated) {
+            // User is already authenticated - restore user state from localStorage
+            const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
+            const foundUser = existingUsers.find((u: User) => u.id === currentUserId);
+            if (foundUser) {
+              // Restore user state in App.tsx
+              onLogin(foundUser);
+              return;
+            }
+          }
+          
           if (!currentUserId) {
             // No account and no localStorage user - automatically redirect to Azure login
             instance.loginRedirect(loginRequest).catch(err => {
@@ -146,7 +191,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     };
 
     init();
-  }, [finalizeLogin, handleLogin, handleLogout, onLoginReady]);
+  }, [finalizeLogin, handleLogin, handleLogout, onLoginReady, onLogin]);
 
   // This component is a handler only - no UI
   // It automatically redirects to Azure login if no account is found
