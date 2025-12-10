@@ -4,7 +4,26 @@ import { Configuration, RedirectRequest } from '@azure/msal-browser';
 const env       = (import.meta as unknown as { env: Record<string, string> })?.env || {};
 const tenantId  = env.VITE_AAD_TENANT_ID  || '767a4f7b-5957-4143-8bd4-b152154fe7f6';
 const clientId  = env.VITE_AAD_CLIENT_ID  || 'bb140565-7dd0-4f93-8336-b2b4bb843580';
-const redirectUri = env.VITE_AAD_REDIRECT_URI || window.location.origin || 'https://riskregister.kauverykonnect.com';
+
+// Redirect URI must be the root of your app (no path)
+// This must match exactly what's configured in Azure AD app registration
+const getRedirectUri = () => {
+  if (typeof window === 'undefined') return 'https://riskregister.kauverykonnect.com';
+  const origin = window.location.origin;
+  // Ensure no trailing slash and no path
+  return origin.replace(/\/$/, '');
+};
+
+const redirectUri = env.VITE_AAD_REDIRECT_URI || getRedirectUri();
+
+// Log the redirect URI for debugging
+if (typeof window !== 'undefined') {
+  console.log('🔧 MSAL Config:', {
+    redirectUri,
+    clientId,
+    tenantId: tenantId.substring(0, 8) + '...',
+  });
+}
 
 export const msalConfig: Configuration = {
   auth: {
@@ -34,5 +53,7 @@ export const msalConfig: Configuration = {
 
 export const loginRequest: RedirectRequest = {
   scopes: ['User.Read'],
+  // Explicitly set redirect URI to ensure it's the root URL, not a callback endpoint
+  redirectUri: redirectUri,
 };
 

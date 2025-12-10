@@ -169,9 +169,15 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       return;
     }
 
+    // Log the redirect URI being used
+    console.log('🚀 Initiating login redirect with:', {
+      redirectUri: loginRequest.redirectUri || msalConfig.auth.redirectUri,
+      scopes: loginRequest.scopes,
+    });
+    
     instance.loginRedirect(loginRequest).catch(err => {
       if (err?.errorCode !== 'interaction_in_progress') {
-        console.error('Login error:', err);
+        console.error('Login redirect error:', err);
       }
     });
   }, [finalizeLogin]);
@@ -309,6 +315,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         const checkUserId = localStorage.getItem('currentUserId');
         if (!checkUserId) {
           console.log('🚀 No account found, redirecting to Azure login...');
+          console.log('🔧 Using redirect URI:', loginRequest.redirectUri || msalConfig.auth.redirectUri);
           instance.loginRedirect(loginRequest).catch(err => {
             if (err?.errorCode !== 'interaction_in_progress') {
               console.error('Login redirect error:', err?.errorCode || err?.message);
