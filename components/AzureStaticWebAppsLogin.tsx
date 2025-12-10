@@ -13,6 +13,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const msalInstanceRef = useRef<PublicClientApplication | null>(null);
 
   useEffect(() => {
@@ -149,12 +150,19 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       localStorage.setItem('users', JSON.stringify(updated));
       
       onLogin(selectedUser);
+      setIsLoggedIn(true);
+      setLoading(false);
     } catch (err: any) {
       setError(String(err?.message ?? err));
       setAccount(null);
       setLoading(false);
     }
   };
+
+  // If login is successful, let parent component render the dashboard
+  if (isLoggedIn) {
+    return null;
+  }
 
   if (loading) {
     return (

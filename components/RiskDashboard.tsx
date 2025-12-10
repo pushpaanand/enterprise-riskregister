@@ -228,32 +228,32 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       </div>
 
       {activeTab !== 'incidents' && (
-        <dl className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-6">
-          <div className="overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6">
-            <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Total</dt>
-            <dd className="mt-1 text-3xl font-semibold tracking-tight text-base-content dark:text-dark-content">{riskStats.total}</dd>
-          </div>
-          <button type="button" onClick={() => openKpiModal('Severe')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
-            <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Severe</dt>
-            <dd className="mt-1 text-3xl font-semibold tracking-tight text-red-500">{riskStats.severe}</dd>
-          </button>
-          <button type="button" onClick={() => openKpiModal('Significant')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
-            <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Significant</dt>
-            <dd className="mt-1 text-3xl font-semibold tracking-tight text-orange-500">{riskStats.significant}</dd>
-          </button>
-          <button type="button" onClick={() => openKpiModal('Moderate')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
-            <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Moderate</dt>
-            <dd className="mt-1 text-3xl font-semibold tracking-tight text-yellow-500">{riskStats.moderate}</dd>
-          </button>
-          <button type="button" onClick={() => openKpiModal('Minor')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
-            <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Minor</dt>
-            <dd className="mt-1 text-3xl font-semibold tracking-tight text-lime-600">{riskStats.minor}</dd>
-          </button>
-          <button type="button" onClick={() => openKpiModal('Negligible')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
-            <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Negligible</dt>
-            <dd className="mt-1 text-3xl font-semibold tracking-tight text-green-600">{riskStats.negligible}</dd>
-          </button>
-        </dl>
+      <dl className="mt-8 grid grid-cols-2 gap-5 sm:grid-cols-6">
+        <div className="overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6">
+          <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Total</dt>
+          <dd className="mt-1 text-3xl font-semibold tracking-tight text-base-content dark:text-dark-content">{riskStats.total}</dd>
+        </div>
+        <button type="button" onClick={() => openKpiModal('Severe')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
+          <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Severe</dt>
+          <dd className="mt-1 text-3xl font-semibold tracking-tight text-red-500">{riskStats.severe}</dd>
+        </button>
+        <button type="button" onClick={() => openKpiModal('Significant')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
+          <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Significant</dt>
+          <dd className="mt-1 text-3xl font-semibold tracking-tight text-orange-500">{riskStats.significant}</dd>
+        </button>
+        <button type="button" onClick={() => openKpiModal('Moderate')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
+          <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Moderate</dt>
+          <dd className="mt-1 text-3xl font-semibold tracking-tight text-yellow-500">{riskStats.moderate}</dd>
+        </button>
+        <button type="button" onClick={() => openKpiModal('Minor')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
+          <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Minor</dt>
+          <dd className="mt-1 text-3xl font-semibold tracking-tight text-lime-600">{riskStats.minor}</dd>
+        </button>
+        <button type="button" onClick={() => openKpiModal('Negligible')} className="text-left overflow-hidden rounded-lg bg-base-200 dark:bg-dark-200 px-4 py-5 shadow sm:p-6 hover:ring-2 hover:ring-brand-primary cursor-pointer">
+          <dt className="truncate text-sm font-medium text-base-content-muted dark:text-dark-content-muted">Negligible</dt>
+          <dd className="mt-1 text-3xl font-semibold tracking-tight text-green-600">{riskStats.negligible}</dd>
+        </button>
+      </dl>
       )}
 
       {activeTab !== 'incidents' && showSummary && (
@@ -324,7 +324,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       {activeTab === 'risks' ? (
         <div className="mt-8">
           {/* Filters */}
-      <div className="mb-3 flex flex-wrap items-center gap-3">
+          <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-sm text-base-content dark:text-dark-content">Status</label>
               <select
@@ -372,7 +372,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             placeholder="Search by ID, description, category..."
             className={filterInputStyles + ' flex-1'}
           />
-        </div>
+            </div>
           </div>
           {(() => {
             // Apply admin-level dept filter first, and exclude rejected and raised risks (raised risks are shown in Pending Action tab)
