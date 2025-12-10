@@ -20,6 +20,29 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     const init = async () => {
       try {
         setLoading(true);
+        
+        // Check if user is already logged in (from previous session)
+        const existingUserId = localStorage.getItem('currentUserId');
+        if (existingUserId) {
+          // User might already be logged in, check if we have an MSAL account
+          const instance = new PublicClientApplication(msalConfig);
+          msalInstanceRef.current = instance;
+          if ((instance as any).initialize) {
+            await (instance as any).initialize();
+          }
+          
+          const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+          if (activeAccount) {
+            instance.setActiveAccount(activeAccount);
+            // Don't call finalizeLogin again if already logged in, just set loading to false
+            // The parent App.tsx should handle showing the dashboard
+            setAccount(activeAccount);
+            setIsLoggedIn(true);
+            setLoading(false);
+            return;
+          }
+        }
+
         const instance = new PublicClientApplication(msalConfig);
         msalInstanceRef.current = instance;
         if ((instance as any).initialize) {
@@ -149,9 +172,14 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       const updated = [selectedUser, ...existingUsers.filter(u => u.id !== selectedUser.id)];
       localStorage.setItem('users', JSON.stringify(updated));
       
+      // Call onLogin to update parent component
       onLogin(selectedUser);
+      
+      // Mark as logged in and keep loading state to prevent flash of login UI
       setIsLoggedIn(true);
-      setLoading(false);
+      setAccount(principal);
+      // Keep loading true - parent will unmount this component when currentUser is set
+      // This prevents showing the login UI after successful authentication
     } catch (err: any) {
       setError(String(err?.message ?? err));
       setAccount(null);
@@ -164,11 +192,22 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     return null;
   }
 
-  if (loading) {
+  // Also check if user is already logged in (from localStorage)
+  // This prevents showing login UI after redirect when parent hasn't updated yet
+  const currentUserId = localStorage.getItem('currentUserId');
+  if (currentUserId && account) {
+    // User is logged in, don't show login UI
+    return null;
+  }
+
+  // If we have an account but are still loading (finalizing login), show loading state
+  if (loading || (account && !currentUserId)) {
     return (
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-md shadow p-6 text-center">
-          <p className="text-base-content dark:text-dark-content">Checking authentication...</p>
+          <p className="text-base-content dark:text-dark-content">
+            {account ? 'Completing sign in...' : 'Checking authentication...'}
+          </p>
         </div>
       </div>
     );
