@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { PublicClientApplication, AccountInfo } from '@azure/msal-browser';
 import { User } from '../types';
 import { apiUrl } from '../api';
@@ -14,6 +14,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   const msalInstanceRef = useRef<PublicClientApplication | null>(null);
   const initRef = useRef<boolean>(false);
   const processingRef = useRef<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const clearMSALCache = useCallback(async (instance: PublicClientApplication) => {
     try {
@@ -91,12 +92,16 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       if (!res.ok) {
         console.error('❌ Backend error response:', data);
         const errorMsg = data?.error || data?.detail || 'Failed to authenticate with backend';
+        const fullErrorMsg = `Backend Authentication Error (${res.status}): ${errorMsg}`;
         console.error('❌ Error details:', {
           status: res.status,
           error: errorMsg,
           receivedEmail: azureEmail,
           receivedName: azureName,
         });
+        
+        // Set error message for UI display
+        setErrorMessage(fullErrorMsg);
         
         // Show user-friendly error
         if (res.status === 404) {
@@ -151,7 +156,9 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       // Call onLogin - parent will update and route based on role
       onLogin(selectedUser);
     } catch (err: any) {
-      console.error('❌ Failed to finalize login:', err?.message || err);
+      const errorMsg = err?.message || String(err) || 'Unknown error during login';
+      console.error('❌ Failed to finalize login:', errorMsg);
+      setErrorMessage(`Login Finalization Error: ${errorMsg}`);
       // Clear any partial data
       localStorage.removeItem('currentUserId');
       localStorage.removeItem('isAuthenticated');
@@ -219,6 +226,60 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   }, []);
 
   useEffect(() => {
+    // Check if we're on the callback URL with an error
+    const currentUrl = window.location.href;
+    const urlHash = window.location.hash;
+    const urlSearch = window.location.search;
+    
+    // Check for errors in URL hash (MSAL uses hash fragments)
+    if (urlHash) {
+      const hashParams = new URLSearchParams(urlHash.substring(1)); // Remove #
+      const hashError = hashParams.get('error');
+      const hashErrorDescription = hashParams.get('error_description');
+      
+      if (hashError) {
+        const fullError = hashErrorDescription || hashError || 'Authentication failed';
+        console.error('❌ MSAL Hash Error:', {
+          error: hashError,
+          errorDescription: hashErrorDescription,
+          fullUrl: currentUrl,
+        });
+        setErrorMessage(`MSAL Authentication Error: ${fullError}`);
+        
+        // Clear the error from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        return;
+      }
+    }
+    
+    // Check for errors in query string (Azure Static Web Apps callback)
+    if (currentUrl.includes('/.auth/login/aad/callback') || urlSearch) {
+      const urlParams = new URLSearchParams(urlSearch);
+      const error = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
+      const errorCode = urlParams.get('error_code');
+      
+      if (error || errorCode) {
+        const fullError = errorDescription || error || 'Authentication failed';
+        console.error('❌ Azure AD Callback Error:', {
+          error,
+          errorCode,
+          errorDescription,
+          fullUrl: currentUrl,
+        });
+        setErrorMessage(`Azure AD Authentication Error (${errorCode || error}): ${fullError}`);
+        
+        // Clear the error from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        
+        // Redirect to home after showing error
+        setTimeout(() => {
+          window.location.href = window.location.origin;
+        }, 5000);
+        return;
+      }
+    }
+
     // Prevent multiple initializations
     if (initRef.current || processingRef.current) {
       return;
@@ -282,17 +343,13 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
             }
           } else if (redirectErr?.errorCode === 'invalid_request' || 
                      redirectErr?.errorMessage?.includes('AADSTS9002326')) {
-            console.error('❌ Azure AD SPA Configuration Error');
-            console.error('The app must be registered as a "Single-Page Application" in Azure AD.');
-            console.error('Steps to fix:');
-            console.error('1. Go to Azure Portal → Azure AD → App registrations');
-            console.error('2. Select your app (Client ID: ' + msalConfig.auth.clientId + ')');
-            console.error('3. Go to "Authentication" → Add platform → "Single-page application"');
-            console.error('4. Add redirect URI: ' + msalConfig.auth.redirectUri);
-            console.error('5. Enable "ID tokens" under Implicit grant');
-            alert('Azure AD Configuration Error: The app must be registered as a "Single-Page Application". Please contact your administrator.');
+            const errorMsg = 'Azure AD SPA Configuration Error: The app must be registered as a "Single-Page Application" in Azure AD. Redirect URI must be: ' + msalConfig.auth.redirectUri;
+            console.error('❌', errorMsg);
+            setErrorMessage(errorMsg);
           } else {
-            console.error('❌ Redirect error:', redirectErr?.errorCode || redirectErr?.message);
+            const errorMsg = `MSAL Redirect Error: ${redirectErr?.errorCode || redirectErr?.errorMessage || redirectErr?.message || 'Unknown error'}`;
+            console.error('❌', errorMsg);
+            setErrorMessage(errorMsg);
           }
         }
         
@@ -338,6 +395,33 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
     init();
   }, [finalizeLogin, handleLogin, handleLogout, onLoginReady, onLogin, clearMSALCache]);
+
+  // Show error UI if there's an error message
+  if (errorMessage) {
+    return (
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="max-w-md mx-auto bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md shadow p-6">
+          <h2 className="text-xl font-bold text-red-800 dark:text-red-200 mb-4">
+            Authentication Error
+          </h2>
+          <p className="text-red-700 dark:text-red-300 mb-4">{errorMessage}</p>
+          <div className="bg-red-100 dark:bg-red-900/40 p-4 rounded mt-4">
+            <p className="text-sm text-red-800 dark:text-red-200 font-semibold mb-2">
+              Common Causes:
+            </p>
+            <ul className="text-sm text-red-700 dark:text-red-300 list-disc list-inside space-y-1">
+              <li>Redirect URI mismatch in Azure AD app registration</li>
+              <li>App not configured as "Single-Page Application" in Azure AD</li>
+              <li>Incorrect redirect URI: Should be <code className="bg-red-200 dark:bg-red-800 px-1 rounded">https://riskregister.kauverykonnect.com</code> (no path)</li>
+            </ul>
+          </div>
+          <p className="text-sm text-red-600 dark:text-red-400 mt-4">
+            Redirecting to home page in 5 seconds...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // This component is a handler only - no UI
   // It automatically redirects to Azure login if no account is found
