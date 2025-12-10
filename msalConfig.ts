@@ -11,10 +11,24 @@ export const msalConfig: Configuration = {
     clientId,
     authority: `https://login.microsoftonline.com/${tenantId}`,
     redirectUri,
+    // Ensure this is configured as SPA in Azure AD
+    navigateToLoginRequestUrl: true,
   },
   cache: {
     cacheLocation: 'localStorage',
     storeAuthStateInCookie: true,
+  },
+  system: {
+    // Handle state mismatch errors
+    allowNativeBroker: false,
+    loggerOptions: {
+      loggerCallback: (level, message, containsPii) => {
+        if (containsPii) return;
+        if (level === 0) console.error('MSAL Error:', message);
+        else if (level === 1) console.warn('MSAL Warning:', message);
+      },
+      logLevel: 1, // Warning level
+    },
   },
 };
 

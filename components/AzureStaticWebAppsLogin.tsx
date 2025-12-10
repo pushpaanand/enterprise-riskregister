@@ -13,6 +13,37 @@ interface AzureStaticWebAppsLoginProps {
 const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users: _users, onLogin, onLoginReady }) => {
   const msalInstanceRef = useRef<PublicClientApplication | null>(null);
 
+  const clearMSALCache = useCallback(async (instance: PublicClientApplication) => {
+    try {
+      // Clear MSAL browser storage keys
+      const clientId = msalConfig.auth.clientId;
+      const keysToRemove: string[] = [];
+      
+      // Find all MSAL-related keys
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith(`msal.${clientId}`) || key.startsWith('msal.'))) {
+          keysToRemove.push(key);
+        }
+      }
+      
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const key = sessionStorage.key(i);
+        if (key && (key.startsWith(`msal.${clientId}`) || key.startsWith('msal.'))) {
+          keysToRemove.push(key);
+        }
+      }
+      
+      // Remove all MSAL keys
+      keysToRemove.forEach(key => {
+        localStorage.removeItem(key);
+        sessionStorage.removeItem(key);
+      });
+    } catch (err) {
+      console.warn('Error clearing MSAL cache:', err);
+    }
+  }, []);
+
   const finalizeLogin = useCallback(async (principal: AccountInfo) => {
     try {
       const azureName = principal.name || principal.username || '';
@@ -144,7 +175,56 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         }
 
         // Handle redirect response from Azure AD
-        const redirectResponse = await instance.handleRedirectPromise();
+        let redirectResponse;
+        try {
+          redirectResponse = await instance.handleRedirectPromise();
+        } catch (redirectErr: any) {
+          // Handle state mismatch - clear cache and retry
+          if (redirectErr?.errorCode === 'state_mismatch' || redirectErr?.errorMessage?.includes('state_mismatch')) {
+            console.warn('State mismatch detected, clearing cache and retrying...');
+            try {
+              // Clear MSAL cache
+              await clearMSALCache(instance);
+              // Clear localStorage auth data
+              localStorage.removeItem('currentUserId');
+              localStorage.removeItem('isAuthenticated');
+              localStorage.removeItem('azureUser');
+              // Small delay before retry to ensure cache is cleared
+              setTimeout(() => {
+                instance.loginRedirect(loginRequest).catch(err => {
+                  if (err?.errorCode !== 'interaction_in_progress') {
+                    console.error('Retry login error:', err);
+                  }
+                });
+              }, 100);
+              return;
+            } catch (clearErr) {
+              console.error('Error clearing cache:', clearErr);
+            }
+          }
+          
+          // Handle SPA configuration error
+          if (redirectErr?.errorCode === 'invalid_request' || 
+              redirectErr?.errorMessage?.includes('AADSTS9002326') ||
+              redirectErr?.errorMessage?.includes('Cross-origin token redemption')) {
+            console.error('Azure AD Configuration Error: The app must be registered as a "Single-Page Application" (SPA) in Azure AD.');
+            console.error('Please ensure:');
+            console.error('1. App registration platform is set to "Single-page application"');
+            console.error('2. Redirect URI matches exactly: ' + window.location.origin);
+            console.error('3. Implicit grant and hybrid flows are enabled');
+            // Try to continue with existing account if available
+            const existingAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+            if (existingAccount) {
+              instance.setActiveAccount(existingAccount);
+              await finalizeLogin(existingAccount);
+              return;
+            }
+          }
+          
+          // For other errors, log and continue
+          console.error('Redirect promise error:', redirectErr);
+        }
+        
         const activeAccount =
           redirectResponse?.account ||
           instance.getActiveAccount() ||
@@ -191,7 +271,7 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
     };
 
     init();
-  }, [finalizeLogin, handleLogin, handleLogout, onLoginReady, onLogin]);
+  }, [finalizeLogin, handleLogin, handleLogout, onLoginReady, onLogin, clearMSALCache]);
 
   // This component is a handler only - no UI
   // It automatically redirects to Azure login if no account is found
