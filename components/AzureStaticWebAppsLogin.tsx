@@ -46,10 +46,12 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
   const finalizeLogin = useCallback(async (principal: AccountInfo) => {
     try {
+      console.log('🔐 Finalizing login for:', principal.username);
       const azureName = principal.name || principal.username || '';
       const azureEmail = principal.username || '';
       const azureId = principal.homeAccountId || principal.localAccountId || '';
 
+      console.log('📡 Calling backend API:', apiUrl('/auth/azure-login'));
       const res = await fetch(apiUrl('/auth/azure-login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,9 +65,14 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       });
 
       const data = await res.json();
+      console.log('📥 Backend API response:', data);
 
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to authenticate with backend');
+      }
+
+      if (!data.user) {
+        throw new Error('No user data returned from backend');
       }
 
       const apiUser = data.user as any;
@@ -79,6 +86,8 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         unit: apiUser.Unit || undefined,
         isUnitHead: Boolean(apiUser.IsUnitHead),
       };
+
+      console.log('✅ User data prepared:', selectedUser);
 
       // Store all user data in localStorage (similar to sample code)
       localStorage.setItem('currentUserId', selectedUser.id);
@@ -104,10 +113,27 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       const updated = [selectedUser, ...existingUsers.filter(u => u.id !== selectedUser.id)];
       localStorage.setItem('users', JSON.stringify(updated));
       
+      console.log('💾 localStorage updated:', {
+        currentUserId: localStorage.getItem('currentUserId'),
+        userRole: localStorage.getItem('userRole'),
+        userName: localStorage.getItem('userName'),
+        isAuthenticated: localStorage.getItem('isAuthenticated'),
+      });
+      
       // Call onLogin - parent will update and route based on role
+      console.log('🚀 Calling onLogin callback with user:', selectedUser);
       onLogin(selectedUser);
+      console.log('✅ onLogin callback completed');
     } catch (err: any) {
-      console.error('Failed to finalize login:', err);
+      console.error('❌ Failed to finalize login:', err);
+      console.error('Error details:', {
+        message: err?.message,
+        stack: err?.stack,
+        response: err?.response,
+      });
+      // Clear any partial data
+      localStorage.removeItem('currentUserId');
+      localStorage.removeItem('isAuthenticated');
     }
   }, [onLogin]);
 
@@ -175,10 +201,16 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         }
 
         // Handle redirect response from Azure AD
+        console.log('🔄 Checking for redirect response...');
         let redirectResponse;
         try {
           redirectResponse = await instance.handleRedirectPromise();
+          console.log('📨 Redirect response:', redirectResponse ? 'Received' : 'None');
+          if (redirectResponse?.account) {
+            console.log('👤 Account from redirect:', redirectResponse.account.username);
+          }
         } catch (redirectErr: any) {
+          console.error('❌ Redirect promise error:', redirectErr);
           // Handle state mismatch - clear cache and retry
           if (redirectErr?.errorCode === 'state_mismatch' || redirectErr?.errorMessage?.includes('state_mismatch')) {
             console.warn('State mismatch detected, clearing cache and retrying...');
@@ -230,28 +262,45 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
           instance.getActiveAccount() ||
           instance.getAllAccounts()[0];
 
+        console.log('🔍 Active account check:', {
+          fromRedirect: !!redirectResponse?.account,
+          fromGetActive: !!instance.getActiveAccount(),
+          fromGetAll: instance.getAllAccounts().length > 0,
+          activeAccount: activeAccount ? activeAccount.username : 'None',
+        });
+
         if (activeAccount) {
+          console.log('✅ Active account found, finalizing login...');
           instance.setActiveAccount(activeAccount);
           await finalizeLogin(activeAccount);
           // Don't set loading to false here - finalizeLogin will call onLogin
           // and parent will unmount this component
         } else {
+          console.log('⚠️ No active account found, checking localStorage...');
           // No account found - check if user is already logged in via localStorage
           const currentUserId = localStorage.getItem('currentUserId');
           const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+          
+          console.log('📦 localStorage check:', {
+            currentUserId,
+            isAuthenticated,
+          });
           
           if (currentUserId && isAuthenticated) {
             // User is already authenticated - restore user state from localStorage
             const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
             const foundUser = existingUsers.find((u: User) => u.id === currentUserId);
+            console.log('🔍 Found user in localStorage:', foundUser ? foundUser.name : 'None');
             if (foundUser) {
               // Restore user state in App.tsx
+              console.log('🔄 Restoring user from localStorage...');
               onLogin(foundUser);
               return;
             }
           }
           
           if (!currentUserId) {
+            console.log('🚀 No user found, redirecting to Azure login...');
             // No account and no localStorage user - automatically redirect to Azure login
             instance.loginRedirect(loginRequest).catch(err => {
               if (err?.errorCode !== 'interaction_in_progress') {

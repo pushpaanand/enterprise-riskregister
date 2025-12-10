@@ -108,6 +108,25 @@ const App: React.FC = () => {
     const linkActionProcessingRef = useRef(false);
     const [azureLogoutFn, setAzureLogoutFn] = useState<(() => void) | null>(null);
 
+    // Restore user from localStorage if it exists but currentUser is null
+    useEffect(() => {
+        if (!currentUser) {
+            const savedId = localStorage.getItem('currentUserId');
+            const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+            console.log('🔍 App.tsx: Checking localStorage for user:', { savedId, isAuthenticated });
+            if (savedId && isAuthenticated) {
+                const allUsers = JSON.parse(localStorage.getItem('users') || '[]');
+                const foundUser = allUsers.find((u: User) => u.id === savedId);
+                if (foundUser) {
+                    console.log('✅ App.tsx: Restoring user from localStorage:', foundUser.name);
+                    setCurrentUser(foundUser);
+                } else {
+                    console.warn('⚠️ App.tsx: User ID found in localStorage but user not in users array');
+                }
+            }
+        }
+    }, [currentUser]);
+
     useEffect(() => {
         (async () => {
             try {
@@ -368,12 +387,16 @@ const App: React.FC = () => {
     // User switching removed - users can only see their own account
 
     const handleLoggedIn = (user: User) => {
+        console.log('📥 handleLoggedIn called with user:', user);
         // Sync users from localStorage (in case login created a new user)
         const syncedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        console.log('👥 Synced users from localStorage:', syncedUsers.length);
         if (Array.isArray(syncedUsers) && syncedUsers.length) {
             setUsers(syncedUsers);
         }
+        console.log('✅ Setting currentUser to:', user.name, user.role);
         setCurrentUser(user);
+        console.log('✅ currentUser state updated');
     };
 
     const currentUserId = currentUser?.id;
