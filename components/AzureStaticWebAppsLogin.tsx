@@ -12,6 +12,8 @@ interface AzureStaticWebAppsLoginProps {
 
 const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users: _users, onLogin, onLoginReady }) => {
   const msalInstanceRef = useRef<PublicClientApplication | null>(null);
+  const initRef = useRef<boolean>(false);
+  const processingRef = useRef<boolean>(false);
 
   const clearMSALCache = useCallback(async (instance: PublicClientApplication) => {
     try {
@@ -46,12 +48,10 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
   const finalizeLogin = useCallback(async (principal: AccountInfo) => {
     try {
-      console.log('🔐 Finalizing login for:', principal.username);
       const azureName = principal.name || principal.username || '';
       const azureEmail = principal.username || '';
       const azureId = principal.homeAccountId || principal.localAccountId || '';
 
-      console.log('📡 Calling backend API:', apiUrl('/auth/azure-login'));
       const res = await fetch(apiUrl('/auth/azure-login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,7 +65,6 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       });
 
       const data = await res.json();
-      console.log('📥 Backend API response:', data);
 
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to authenticate with backend');
@@ -86,8 +85,6 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
         unit: apiUser.Unit || undefined,
         isUnitHead: Boolean(apiUser.IsUnitHead),
       };
-
-      console.log('✅ User data prepared:', selectedUser);
 
       // Store all user data in localStorage (similar to sample code)
       localStorage.setItem('currentUserId', selectedUser.id);
@@ -113,24 +110,12 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       const updated = [selectedUser, ...existingUsers.filter(u => u.id !== selectedUser.id)];
       localStorage.setItem('users', JSON.stringify(updated));
       
-      console.log('💾 localStorage updated:', {
-        currentUserId: localStorage.getItem('currentUserId'),
-        userRole: localStorage.getItem('userRole'),
-        userName: localStorage.getItem('userName'),
-        isAuthenticated: localStorage.getItem('isAuthenticated'),
-      });
+      console.log('✅ Login successful:', selectedUser.name, selectedUser.role);
       
       // Call onLogin - parent will update and route based on role
-      console.log('🚀 Calling onLogin callback with user:', selectedUser);
       onLogin(selectedUser);
-      console.log('✅ onLogin callback completed');
     } catch (err: any) {
-      console.error('❌ Failed to finalize login:', err);
-      console.error('Error details:', {
-        message: err?.message,
-        stack: err?.stack,
-        response: err?.response,
-      });
+      console.error('❌ Failed to finalize login:', err?.message || err);
       // Clear any partial data
       localStorage.removeItem('currentUserId');
       localStorage.removeItem('isAuthenticated');
@@ -192,130 +177,111 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
   }, []);
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const instance = new PublicClientApplication(msalConfig);
-        msalInstanceRef.current = instance;
-        if ((instance as any).initialize) {
-          await (instance as any).initialize();
-        }
+    // Prevent multiple initializations
+    if (initRef.current || processingRef.current) {
+      return;
+    }
 
-        // Handle redirect response from Azure AD
-        console.log('🔄 Checking for redirect response...');
-        let redirectResponse;
+    const init = async () => {
+      // Check if user is already logged in from localStorage first
+      const currentUserId = localStorage.getItem('currentUserId');
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      
+      if (currentUserId && isAuthenticated) {
+        const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
+        const foundUser = existingUsers.find((u: User) => u.id === currentUserId);
+        if (foundUser) {
+          console.log('✅ User already authenticated, restoring from localStorage');
+          onLogin(foundUser);
+          initRef.current = true;
+          return;
+        }
+      }
+
+      if (processingRef.current) {
+        return;
+      }
+      processingRef.current = true;
+
+      try {
+        // Only create instance if not already created
+        if (!msalInstanceRef.current) {
+          const instance = new PublicClientApplication(msalConfig);
+          msalInstanceRef.current = instance;
+          if ((instance as any).initialize) {
+            await (instance as any).initialize();
+          }
+        }
+        const instance = msalInstanceRef.current;
+
+        // Handle redirect response from Azure AD (only once)
+        let redirectResponse = null;
         try {
           redirectResponse = await instance.handleRedirectPromise();
-          console.log('📨 Redirect response:', redirectResponse ? 'Received' : 'None');
           if (redirectResponse?.account) {
-            console.log('👤 Account from redirect:', redirectResponse.account.username);
+            console.log('✅ Redirect response received with account:', redirectResponse.account.username);
           }
         } catch (redirectErr: any) {
-          console.error('❌ Redirect promise error:', redirectErr);
-          // Handle state mismatch - clear cache and retry
+          // Only log state mismatch, don't retry if user is already logged in
           if (redirectErr?.errorCode === 'state_mismatch' || redirectErr?.errorMessage?.includes('state_mismatch')) {
-            console.warn('State mismatch detected, clearing cache and retrying...');
-            try {
-              // Clear MSAL cache
-              await clearMSALCache(instance);
-              // Clear localStorage auth data
-              localStorage.removeItem('currentUserId');
-              localStorage.removeItem('isAuthenticated');
-              localStorage.removeItem('azureUser');
-              // Small delay before retry to ensure cache is cleared
-              setTimeout(() => {
-                instance.loginRedirect(loginRequest).catch(err => {
-                  if (err?.errorCode !== 'interaction_in_progress') {
-                    console.error('Retry login error:', err);
-                  }
-                });
-              }, 100);
-              return;
-            } catch (clearErr) {
-              console.error('Error clearing cache:', clearErr);
-            }
-          }
-          
-          // Handle SPA configuration error
-          if (redirectErr?.errorCode === 'invalid_request' || 
-              redirectErr?.errorMessage?.includes('AADSTS9002326') ||
-              redirectErr?.errorMessage?.includes('Cross-origin token redemption')) {
-            console.error('Azure AD Configuration Error: The app must be registered as a "Single-Page Application" (SPA) in Azure AD.');
-            console.error('Please ensure:');
-            console.error('1. App registration platform is set to "Single-page application"');
-            console.error('2. Redirect URI matches exactly: ' + window.location.origin);
-            console.error('3. Implicit grant and hybrid flows are enabled');
-            // Try to continue with existing account if available
-            const existingAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
-            if (existingAccount) {
-              instance.setActiveAccount(existingAccount);
-              await finalizeLogin(existingAccount);
+            console.warn('⚠️ State mismatch detected (this can happen on page refresh)');
+            // Check again if user is authenticated (might have been set during redirect)
+            const checkUserId = localStorage.getItem('currentUserId');
+            const checkAuth = localStorage.getItem('isAuthenticated') === 'true';
+            if (checkUserId && checkAuth) {
+              console.log('User already authenticated, ignoring state mismatch');
+              const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
+              const foundUser = existingUsers.find((u: User) => u.id === checkUserId);
+              if (foundUser) {
+                onLogin(foundUser);
+              }
+              processingRef.current = false;
               return;
             }
+          } else if (redirectErr?.errorCode === 'invalid_request' || 
+                     redirectErr?.errorMessage?.includes('AADSTS9002326')) {
+            console.error('❌ Azure AD SPA Configuration Error - App must be registered as SPA');
+          } else {
+            console.error('❌ Redirect error:', redirectErr?.errorCode || redirectErr?.message);
           }
-          
-          // For other errors, log and continue
-          console.error('Redirect promise error:', redirectErr);
         }
         
+        // Check for active account
         const activeAccount =
           redirectResponse?.account ||
           instance.getActiveAccount() ||
           instance.getAllAccounts()[0];
 
-        console.log('🔍 Active account check:', {
-          fromRedirect: !!redirectResponse?.account,
-          fromGetActive: !!instance.getActiveAccount(),
-          fromGetAll: instance.getAllAccounts().length > 0,
-          activeAccount: activeAccount ? activeAccount.username : 'None',
-        });
-
         if (activeAccount) {
           console.log('✅ Active account found, finalizing login...');
           instance.setActiveAccount(activeAccount);
           await finalizeLogin(activeAccount);
-          // Don't set loading to false here - finalizeLogin will call onLogin
-          // and parent will unmount this component
-        } else {
-          console.log('⚠️ No active account found, checking localStorage...');
-          // No account found - check if user is already logged in via localStorage
-          const currentUserId = localStorage.getItem('currentUserId');
-          const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-          
-          console.log('📦 localStorage check:', {
-            currentUserId,
-            isAuthenticated,
-          });
-          
-          if (currentUserId && isAuthenticated) {
-            // User is already authenticated - restore user state from localStorage
-            const existingUsers: User[] = JSON.parse(localStorage.getItem('users') || '[]');
-            const foundUser = existingUsers.find((u: User) => u.id === currentUserId);
-            console.log('🔍 Found user in localStorage:', foundUser ? foundUser.name : 'None');
-            if (foundUser) {
-              // Restore user state in App.tsx
-              console.log('🔄 Restoring user from localStorage...');
-              onLogin(foundUser);
-              return;
+          initRef.current = true;
+          processingRef.current = false;
+          return;
+        }
+
+        // No account - only redirect if not already logged in
+        const checkUserId = localStorage.getItem('currentUserId');
+        if (!checkUserId) {
+          console.log('🚀 No account found, redirecting to Azure login...');
+          instance.loginRedirect(loginRequest).catch(err => {
+            if (err?.errorCode !== 'interaction_in_progress') {
+              console.error('Login redirect error:', err?.errorCode || err?.message);
             }
-          }
-          
-          if (!currentUserId) {
-            console.log('🚀 No user found, redirecting to Azure login...');
-            // No account and no localStorage user - automatically redirect to Azure login
-            instance.loginRedirect(loginRequest).catch(err => {
-              if (err?.errorCode !== 'interaction_in_progress') {
-                console.error('Auto-login redirect error:', err);
-              }
-            });
-          }
+          });
         }
 
         // Expose login/logout methods to parent
         if (onLoginReady) {
           onLoginReady(handleLogin, handleLogout);
         }
+        
+        initRef.current = true;
       } catch (err: any) {
-        console.error('MSAL init failed', err);
+        console.error('❌ MSAL init failed:', err?.message || err);
+      } finally {
+        processingRef.current = false;
       }
     };
 
