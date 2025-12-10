@@ -48,26 +48,62 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
 
   const finalizeLogin = useCallback(async (principal: AccountInfo) => {
     try {
+      // MSAL AccountInfo structure:
+      // - principal.username: usually the email (e.g., "127547@kauveryhospital.com")
+      // - principal.name: display name (e.g., "John Doe")
+      // - principal.homeAccountId: unique Azure AD account ID
       const azureName = principal.name || principal.username || '';
-      const azureEmail = principal.username || '';
+      const azureEmail = principal.username || ''; // This should be the email/EmployeeId format
       const azureId = principal.homeAccountId || principal.localAccountId || '';
+
+      console.log('🔍 Azure AD Principal Info:', {
+        username: principal.username,
+        name: principal.name,
+        email: azureEmail,
+        homeAccountId: principal.homeAccountId,
+        localAccountId: principal.localAccountId,
+      });
+
+      // The backend expects email to match EmployeeId in Users table
+      // EmployeeId format should be: "127547@kauveryhospital.com" (6 digits @kauveryhospital.com)
+      const payload = {
+        azureId: azureId,
+        email: azureEmail, // This is what backend uses to match EmployeeId
+        name: azureName,
+        identityProvider: principal.environment || 'aad',
+        roles: [],
+      };
+
+      console.log('📤 Sending to backend:', {
+        email: payload.email,
+        name: payload.name,
+        azureId: payload.azureId,
+      });
 
       const res = await fetch(apiUrl('/auth/azure-login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          azureId: azureId,
-          email: azureEmail,
-          name: azureName,
-          identityProvider: principal.environment || 'aad',
-          roles: [],
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data?.error || 'Failed to authenticate with backend');
+        console.error('❌ Backend error response:', data);
+        const errorMsg = data?.error || data?.detail || 'Failed to authenticate with backend';
+        console.error('❌ Error details:', {
+          status: res.status,
+          error: errorMsg,
+          receivedEmail: azureEmail,
+          receivedName: azureName,
+        });
+        
+        // Show user-friendly error
+        if (res.status === 404) {
+          alert(`Account not found: ${errorMsg}\n\nPlease contact your administrator to ensure your EmployeeId (${azureEmail}) is registered in the system.`);
+        }
+        
+        throw new Error(errorMsg);
       }
 
       if (!data.user) {
@@ -240,7 +276,15 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
             }
           } else if (redirectErr?.errorCode === 'invalid_request' || 
                      redirectErr?.errorMessage?.includes('AADSTS9002326')) {
-            console.error('❌ Azure AD SPA Configuration Error - App must be registered as SPA');
+            console.error('❌ Azure AD SPA Configuration Error');
+            console.error('The app must be registered as a "Single-Page Application" in Azure AD.');
+            console.error('Steps to fix:');
+            console.error('1. Go to Azure Portal → Azure AD → App registrations');
+            console.error('2. Select your app (Client ID: ' + msalConfig.auth.clientId + ')');
+            console.error('3. Go to "Authentication" → Add platform → "Single-page application"');
+            console.error('4. Add redirect URI: ' + msalConfig.auth.redirectUri);
+            console.error('5. Enable "ID tokens" under Implicit grant');
+            alert('Azure AD Configuration Error: The app must be registered as a "Single-Page Application". Please contact your administrator.');
           } else {
             console.error('❌ Redirect error:', redirectErr?.errorCode || redirectErr?.message);
           }
