@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { PublicClientApplication, AccountInfo } from '@azure/msal-browser';
 import { User } from '../types';
 import { apiUrl } from '../api';
@@ -7,132 +7,14 @@ import { msalConfig, loginRequest } from '../msalConfig';
 interface AzureStaticWebAppsLoginProps {
   users: User[];
   onLogin: (user: User) => void;
+  onLoginReady?: (loginFn: () => void, logoutFn: () => void) => void;
 }
 
-const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users: _users, onLogin }) => {
-  const [error, setError] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
-  const [account, setAccount] = useState<AccountInfo | null>(null);
-  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users: _users, onLogin, onLoginReady }) => {
   const msalInstanceRef = useRef<PublicClientApplication | null>(null);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        
-        // Check if user is already logged in (from previous session)
-        const existingUserId = localStorage.getItem('currentUserId');
-        if (existingUserId) {
-          // User might already be logged in, check if we have an MSAL account
-          const instance = new PublicClientApplication(msalConfig);
-          msalInstanceRef.current = instance;
-          if ((instance as any).initialize) {
-            await (instance as any).initialize();
-          }
-          
-          const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
-          if (activeAccount) {
-            instance.setActiveAccount(activeAccount);
-            // Don't call finalizeLogin again if already logged in, just set loading to false
-            // The parent App.tsx should handle showing the dashboard
-            setAccount(activeAccount);
-            setIsLoggedIn(true);
-            setLoading(false);
-            return;
-          }
-        }
-
-        const instance = new PublicClientApplication(msalConfig);
-        msalInstanceRef.current = instance;
-        if ((instance as any).initialize) {
-          await (instance as any).initialize();
-        }
-
-        const redirectResponse = await instance.handleRedirectPromise();
-        const activeAccount =
-          redirectResponse?.account ||
-          instance.getActiveAccount() ||
-          instance.getAllAccounts()[0];
-
-        if (!activeAccount) {
-          setAccount(null);
-          setLoading(false);
-          return;
-        }
-
-        instance.setActiveAccount(activeAccount);
-        await finalizeLogin(activeAccount);
-      } catch (err: any) {
-        console.error('MSAL init failed', err);
-        setError('Unable to initialize authentication.');
-        setLoading(false);
-      }
-    };
-
-    init();
-  }, []);
-
-  const clearBrowserCaches = async () => {
-    if (typeof window === 'undefined') return;
+  const finalizeLogin = useCallback(async (principal: AccountInfo) => {
     try {
-      localStorage.clear();
-    } catch (storageErr) {
-      console.warn('Unable to clear localStorage during logout', storageErr);
-    }
-    try {
-      sessionStorage.clear();
-    } catch (storageErr) {
-      console.warn('Unable to clear sessionStorage during logout', storageErr);
-    }
-    if ('caches' in window) {
-      try {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map(name => caches.delete(name)));
-      } catch (cacheErr) {
-        console.warn('Unable to clear CacheStorage during logout', cacheErr);
-      }
-    }
-  };
-
-  const handleLogin = () => {
-    const instance = msalInstanceRef.current;
-    if (!instance) return;
-    setError('');
-
-    if (instance.getActiveAccount()) {
-      finalizeLogin(instance.getActiveAccount() as AccountInfo);
-      return;
-    }
-
-    setLoading(true);
-    instance.loginRedirect(loginRequest).catch(err => {
-      if (err?.errorCode === 'interaction_in_progress') {
-        // Ignore duplicate clicks while redirect is in progress
-        setLoading(false);
-        return;
-      }
-      setLoading(false);
-      setError(String(err?.message ?? err));
-    });
-  };
-
-  const handleLogout = async () => {
-    setError('');
-    await clearBrowserCaches();
-    setAccount(null);
-    const instance = msalInstanceRef.current;
-    if (!instance) return;
-    instance
-      .logoutRedirect({ account: instance.getActiveAccount() || undefined, postLogoutRedirectUri: window.location.origin })
-      .catch(err => setError(String(err?.message ?? err)));
-  };
-
-  const finalizeLogin = async (principal: AccountInfo) => {
-    setLoading(true);
-    setError('');
-    try {
-      setAccount(principal);
       const azureName = principal.name || principal.username || '';
       const azureEmail = principal.username || '';
       const azureId = principal.homeAccountId || principal.localAccountId || '';
@@ -156,11 +38,10 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       }
 
       const apiUser = data.user as any;
-      // Use user data from database (role comes from database, not Azure AD)
       const selectedUser: User = {
         id: apiUser.UserId,
         name: apiUser.Name,
-        role: apiUser.Role as 'user' | 'manager' | 'admin',
+        role: apiUser.Role as 'user' | 'manager' | 'admin' | 'unit_head',
         department: apiUser.Department || undefined,
         email: apiUser.Email || undefined,
         employeeId: apiUser.EmployeeId || undefined,
@@ -172,102 +53,105 @@ const AzureStaticWebAppsLogin: React.FC<AzureStaticWebAppsLoginProps> = ({ users
       const updated = [selectedUser, ...existingUsers.filter(u => u.id !== selectedUser.id)];
       localStorage.setItem('users', JSON.stringify(updated));
       
-      // Call onLogin to update parent component
+      // Call onLogin - parent will update and this component will unmount
       onLogin(selectedUser);
-      
-      // Mark as logged in and keep loading state to prevent flash of login UI
-      setIsLoggedIn(true);
-      setAccount(principal);
-      // Keep loading true - parent will unmount this component when currentUser is set
-      // This prevents showing the login UI after successful authentication
     } catch (err: any) {
-      setError(String(err?.message ?? err));
-      setAccount(null);
-      setLoading(false);
+      console.error('Failed to finalize login:', err);
     }
-  };
+  }, [onLogin]);
 
-  // If login is successful, let parent component render the dashboard
-  if (isLoggedIn) {
-    return null;
-  }
+  const handleLogin = useCallback(() => {
+    const instance = msalInstanceRef.current;
+    if (!instance) return;
 
-  // Also check if user is already logged in (from localStorage)
-  // This prevents showing login UI after redirect when parent hasn't updated yet
-  const currentUserId = localStorage.getItem('currentUserId');
-  if (currentUserId && account) {
-    // User is logged in, don't show login UI
-    return null;
-  }
+    const activeAccount = instance.getActiveAccount() || instance.getAllAccounts()[0];
+    if (activeAccount) {
+      instance.setActiveAccount(activeAccount);
+      finalizeLogin(activeAccount);
+      return;
+    }
 
-  // If we have an account but are still loading (finalizing login), show loading state
-  if (loading || (account && !currentUserId)) {
-    return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-md shadow p-6 text-center">
-          <p className="text-base-content dark:text-dark-content">
-            {account ? 'Completing sign in...' : 'Checking authentication...'}
-          </p>
-        </div>
-      </div>
-    );
-  }
+    instance.loginRedirect(loginRequest).catch(err => {
+      if (err?.errorCode !== 'interaction_in_progress') {
+        console.error('Login error:', err);
+      }
+    });
+  }, [finalizeLogin]);
 
-  return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-md shadow p-6">
-        <h1 className="text-2xl font-bold text-base-content dark:text-dark-content mb-6">
-          Sign in to Kauvery Risk Register
-        </h1>
+  const handleLogout = useCallback(async () => {
+    const instance = msalInstanceRef.current;
+    if (!instance) return;
+    
+    try {
+      localStorage.removeItem('currentUserId');
+      localStorage.removeItem('azureUser');
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      const currentUserId = localStorage.getItem('currentUserId');
+      if (currentUserId) {
+        localStorage.setItem('users', JSON.stringify(users.filter((u: User) => u.id !== currentUserId)));
+      }
+    } catch (err) {
+      console.warn('Error clearing localStorage:', err);
+    }
 
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded text-sm">
-            {error}
-          </div>
-        )}
+    instance
+      .logoutRedirect({ 
+        account: instance.getActiveAccount() || undefined, 
+        postLogoutRedirectUri: window.location.origin 
+      })
+      .catch(err => console.error('Logout error:', err));
+  }, []);
 
-        {!account ? (
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={handleLogin}
-              disabled={loading}
-              className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 16 16" aria-hidden="true">
-                <rect width="7" height="7" x="0" y="0" fill="#F35325" />
-                <rect width="7" height="7" x="9" y="0" fill="#81BC06" />
-                <rect width="7" height="7" x="0" y="9" fill="#05A6F0" />
-                <rect width="7" height="7" x="9" y="9" fill="#FFBA08" />
-              </svg>
-              {loading ? 'Signing in...' : 'Sign in with Microsoft'}
-            </button>
-            <p className="text-sm text-base-content-muted dark:text-dark-content-muted text-center">
-              Use your organizational account to sign in
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="p-4 bg-green-50 dark:bg-green-900 rounded">
-              <p className="text-sm text-green-800 dark:text-green-200">
-                Signed in as: <strong>{account.name || account.username}</strong>
-              </p>
-              <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                {account.username}
-              </p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="w-full rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500"
-            >
-              Sign Out
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const instance = new PublicClientApplication(msalConfig);
+        msalInstanceRef.current = instance;
+        if ((instance as any).initialize) {
+          await (instance as any).initialize();
+        }
+
+        // Handle redirect response from Azure AD
+        const redirectResponse = await instance.handleRedirectPromise();
+        const activeAccount =
+          redirectResponse?.account ||
+          instance.getActiveAccount() ||
+          instance.getAllAccounts()[0];
+
+        if (activeAccount) {
+          instance.setActiveAccount(activeAccount);
+          await finalizeLogin(activeAccount);
+          // Don't set loading to false here - finalizeLogin will call onLogin
+          // and parent will unmount this component
+        } else {
+          // No account found - check if user is already logged in via localStorage
+          const currentUserId = localStorage.getItem('currentUserId');
+          if (!currentUserId) {
+            // No account and no localStorage user - automatically redirect to Azure login
+            instance.loginRedirect(loginRequest).catch(err => {
+              if (err?.errorCode !== 'interaction_in_progress') {
+                console.error('Auto-login redirect error:', err);
+              }
+            });
+          }
+        }
+
+        // Expose login/logout methods to parent
+        if (onLoginReady) {
+          onLoginReady(handleLogin, handleLogout);
+        }
+      } catch (err: any) {
+        console.error('MSAL init failed', err);
+      }
+    };
+
+    init();
+  }, [finalizeLogin, handleLogin, handleLogout, onLoginReady]);
+
+  // This component is a handler only - no UI
+  // It automatically redirects to Azure login if no account is found
+  // After authentication, it calls onLogin and parent handles the dashboard
+  return null;
 };
 
 export default AzureStaticWebAppsLogin;
-

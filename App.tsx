@@ -106,6 +106,7 @@ const App: React.FC = () => {
     const [summaryRiskId, setSummaryRiskId] = useState<string | null>(null);
     const [pendingLinkAction, setPendingLinkAction] = useState<LinkAction | null>(() => parseLinkActionFromLocation());
     const linkActionProcessingRef = useRef(false);
+    const [azureLogoutFn, setAzureLogoutFn] = useState<(() => void) | null>(null);
 
     useEffect(() => {
         (async () => {
@@ -548,10 +549,18 @@ const App: React.FC = () => {
       };
 
     const handleLogout = async () => {
-        await clearBrowserCaches();
-        const origin = window.location.origin;
-        const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
-        window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
+        if (azureLogoutFn) {
+            // Use Azure MSAL logout
+            azureLogoutFn();
+            setCurrentUser(null);
+            localStorage.removeItem('currentUserId');
+        } else {
+            // Fallback to old method
+            await clearBrowserCaches();
+            const origin = window.location.origin;
+            const aadLogout = `https://login.microsoftonline.com/767a4f7b-5957-4143-8bd4-b152154fe7f6/oauth2/v2.0/logout?post_logout_redirect_uri=${encodeURIComponent(origin)}`;
+            window.location.href = `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(aadLogout)}`;
+        }
     };
 
     // Risk CRUD
@@ -1135,8 +1144,13 @@ const App: React.FC = () => {
             </header>
             <main>
                 {!currentUser ? (
-                    <AzureStaticWebAppsLogin users={users} onLogin={handleLoggedIn} />
-                    // <Login users={users} onLogin={handleLoggedIn} />
+                    <AzureStaticWebAppsLogin 
+                        users={users} 
+                        onLogin={handleLoggedIn}
+                        onLoginReady={(_loginFn, logoutFn) => {
+                            setAzureLogoutFn(() => logoutFn);
+                        }}
+                    />
                 ) : currentUser.role === 'admin' ? (
                     adminView === 'admin' ? (
                     <AdminDashboard 
