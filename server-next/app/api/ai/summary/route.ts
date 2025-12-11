@@ -28,6 +28,8 @@ type RiskInput = {
   likelihood?: string;
   status?: string;
   department?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 function withCORS(res: NextResponse) {
@@ -70,19 +72,36 @@ export async function POST(req: Request) {
     const userPrompt =  [
       scopeLine,
       'IMPORTANT: Use ONLY the lists provided below.',
-      'Formatting rules (strict):',
-      '- Start with the header: Risk Summary',
-      '- Then write bullets for risks using "- " (no numbers, no bold).',
+      '',
+      'RISK CATEGORIZATION RULES:',
+      '1. RECENT SEVERE RISKS: Risks with Impact="Severe" that were updated within the last 30 days (check updatedAt date).',
+      '2. OLD RISKS: Risks that have NOT been updated in the last 90 days (regardless of severity). Mark these as "(OLD - No recent updates)".',
+      '3. NON-SEVERE ISSUES: Risks with Impact="Moderate", "Minor", or "Negligible" (not Severe or Significant).',
+      '',
+      'FORMATTING RULES (strict):',
+      '- Start with the header: "Recent Severe Risks"',
+      '- Under "Recent Severe Risks", list ONLY risks that are both Severe impact AND updated recently (within 30 days).',
+      '- For each recent severe risk bullet, include: RiskNo/Name, Impact, Likelihood, Status, and a brief recommended action.',
+      '- After "Recent Severe Risks", add an empty line and the header: "Old Risks (No Recent Updates)"',
+      '- Under "Old Risks", list risks that have NOT been updated in the last 90 days. Mark each as "(OLD - Last updated: YYYY-MM-DD or date if available)".',
+      '- After "Old Risks", add an empty line and the header: "Other Issues (Non-Severe)"',
+      '- Under "Other Issues", list risks with Moderate, Minor, or Negligible impact that are not in the old risks category.',
+      incidents && Array.isArray(incidents) && incidents.length ? '- After all risk sections, add an empty line and the header: "Incident Summary"' : '',
+      incidents && Array.isArray(incidents) && incidents.length ? '- Under "Incident Summary", group by risk: first a bullet "- <RiskNo or Name>:", followed by sub-bullets "- " for each incident (summary, YYYY-MM, status).' : '',
+      '',
+      'FORMATTING DETAILS:',
+      '- Use "- " for all bullets (no numbers, no bold, no extra symbols).',
       '- One sentence per bullet; each bullet on a separate line.',
-      '- Each risk bullet must include: RiskNo/Name, Impact, Likelihood, and a short recommended action.',
-      incidents && Array.isArray(incidents) && incidents.length ? '- After risk bullets, add an empty line and the header: Incident Summary' : '',
-      incidents && Array.isArray(incidents) && incidents.length ? '- Under Incident Summary, group by risk: first a bullet "- <RiskNo or Name>:", followed by sub-bullets "- " for each incident (summary, YYYY-MM, status).' : '',
-      '- Do not include extra symbols or numbering; use plain hyphens only.',
-      '- Keep language simple and clear.',
-      '- Prioritize Severe and Significant risks first.'
+      '- Keep language clear, professional, and concise.',
+      '- Calculate dates from today: recent = updated within 30 days, old = not updated in 90+ days.',
+      '- If updatedAt is missing or invalid, consider the risk as potentially old and mark accordingly.'
     ].filter(Boolean).join('\n');
 
-    const risksText = risks.map((r) => `- riskNo=${r.riskNo || ''}; name=${r.name || ''}; impact=${r.impact || ''}; likelihood=${r.likelihood || ''}; status=${r.status || ''}; dept=${r.department || ''}`).join('\n');
+    const risksText = risks.map((r) => {
+      const createdAt = r.createdAt ? new Date(r.createdAt).toISOString().split('T')[0] : '';
+      const updatedAt = r.updatedAt ? new Date(r.updatedAt).toISOString().split('T')[0] : '';
+      return `- riskNo=${r.riskNo || ''}; name=${r.name || ''}; impact=${r.impact || ''}; likelihood=${r.likelihood || ''}; status=${r.status || ''}; dept=${r.department || ''}; createdAt=${createdAt}; updatedAt=${updatedAt}`;
+    }).join('\n');
     const incidentsText = (Array.isArray(incidents) ? incidents : [])
       .map((i: any) => `- riskNo=${i.RiskNo || i.riskNo || ''}; summary=${i.Summary || i.summary || ''}; occurred=${(i.OccurredAtUtc || i.occurredAt || '').toString().slice(0,7)}; status=${i.CurrentStatusText || i.currentStatusText || ''}`)
       .join('\n');
@@ -90,7 +109,7 @@ export async function POST(req: Request) {
 
 const body: any = {
       messages: [
-        { role: 'system', content: 'You are a professional risk management assistant. Always return concise bullet points using plain hyphens (- ). One sentence per bullet. No numbering, no bold, no tables.' },
+        { role: 'system', content: 'You are a professional risk management assistant specializing in executive risk summaries. Your task is to categorize risks into: (1) Recent Severe Risks - severe impact risks updated within 30 days, (2) Old Risks - risks not updated in 90+ days, and (3) Other Issues - non-severe risks. Always use plain hyphens (- ) for bullets. One sentence per bullet. No numbering, no bold, no tables. Calculate dates from today when categorizing risks.' },
         { role: 'user', content: `${userPrompt}\n\nRisks:\n${risksText}${(incidents && Array.isArray(incidents) && incidents.length) ? `\n\nIncidents:\n${incidentsText}` : ''}` },
       ],
       temperature: 0.3,

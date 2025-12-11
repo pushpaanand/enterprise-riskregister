@@ -1253,12 +1253,14 @@ const App: React.FC = () => {
                                             department: dept,
                                             risks: selectedRisks.map(r => ({
                                                 riskNo: r.riskNo,
-                                                name: r.name,
+                                                name: r.description?.substring(0, 100) || '', // Use first 100 chars of description as name
                                                 description: r.description,
                                                 impact: r.impact,
                                                 likelihood: r.likelihood,
                                                 status: r.status,
                                                 department: r.department,
+                                                createdAt: r.createdAt,
+                                                updatedAt: r.updatedAt,
                                             })),
                                             incidents: selectedIncidents.map(i => ({
                                                 riskNo: selectedRisks.find(r => r.id === i.riskId)?.riskNo,
