@@ -6,9 +6,9 @@ import UnitHeadMailer, { ManagerMailer } from './UnitHeadMailer';
 
 interface AdminDashboardProps {
     users: User[];
-    onAddUser: (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
+    onAddUser: (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
     onRemoveUser: (id: string) => void;
-    onUpdateUser?: (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
+    onUpdateUser?: (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
 }
 
 type AdminTab = 'users' | 'departments' | 'email' | 'emailManagers';

@@ -21,37 +21,51 @@ const unitOptions = [
 
 interface UserAdminPageProps {
   users: User[];
-  onAddUser: (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
+  onAddUser: (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
   onRemoveUser: (id: string) => void;
-  onUpdateUser?: (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
+  onUpdateUser?: (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
 }
 
 const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemoveUser, onUpdateUser }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editRole, setEditRole] = useState<'user' | 'manager' | 'admin' | 'unit_head'>('user');
-  const [editDept, setEditDept] = useState('');
+  const [editDepts, setEditDepts] = useState<string[]>([]);
   const [editEmail, setEditEmail] = useState('');
   const [editUnit, setEditUnit] = useState('');
   const [editIsUnitHead, setEditIsUnitHead] = useState(false);
   const [editEmployeeId, setEditEmployeeId] = useState('');
 
-  const startEdit = (u: User) => {
+  const startEdit = async (u: User) => {
     setEditingId(u.id);
     setEditName(u.name);
     setEditRole(u.role);
-    setEditDept(u.department || '');
     setEditEmail(u.email || '');
     setEditUnit(u.unit || '');
     setEditIsUnitHead(Boolean(u.isUnitHead));
     setEditEmployeeId(u.employeeId || '');
+    
+    // Load assigned departments for this user
+    try {
+      const res = await fetch(apiUrl(`/users/${u.id}/departments`));
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setEditDepts(data.map((d: any) => d.Department).filter(Boolean));
+      } else {
+        // Fallback to single department if API fails
+        setEditDepts(u.department ? [u.department] : []);
+      }
+    } catch (e) {
+      // Fallback to single department if API fails
+      setEditDepts(u.department ? [u.department] : []);
+    }
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditName('');
     setEditRole('user');
-    setEditDept('');
+    setEditDepts([]);
   };
 
   const normalizeEmployeeId = (val: string): string | null => {
@@ -77,7 +91,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
         editingId,
         editName.trim(),
         editRole,
-        editRole === 'admin' ? undefined : (editDept || undefined),
+        (editRole === 'admin' || editRole === 'unit_head') ? undefined : editDepts,
         editEmail.trim() || undefined,
         editUnit.trim() || undefined,
         editIsUnitHead,
@@ -88,7 +102,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
   };
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<'user' | 'manager' | 'admin' | 'unit_head'>('user');
-  const [newUserDept, setNewUserDept] = useState('');
+  const [newUserDepts, setNewUserDepts] = useState<string[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserUnit, setNewUserUnit] = useState('');
   const [newUserIsUnitHead, setNewUserIsUnitHead] = useState(false);
@@ -121,7 +135,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
     onAddUser(
       newUserName.trim(),
       newUserRole,
-      (newUserRole === 'admin' || newUserRole === 'unit_head') ? undefined : (newUserDept.trim() || undefined),
+      (newUserRole === 'admin' || newUserRole === 'unit_head') ? undefined : newUserDepts,
       newUserEmail.trim() || undefined,
       newUserUnit.trim() || undefined,
       newUserIsUnitHead,
@@ -129,7 +143,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
     );
       setNewUserName('');
       setNewUserRole('user');
-      setNewUserDept('');
+      setNewUserDepts([]);
       setNewUserEmail('');
       setNewUserUnit('');
       setNewUserIsUnitHead(false);
@@ -205,19 +219,28 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
             </select>
           </div>
           {(newUserRole !== 'admin' && newUserRole !== 'unit_head') && (
-            <div className="flex-grow min-w-[200px]">
-              <label htmlFor="new-user-dept" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Department</label>
+            <div className="flex-grow min-w-[250px]">
+              <label htmlFor="new-user-depts" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">
+                Departments {newUserDepts.length > 0 && <span className="text-xs text-base-content-muted dark:text-dark-content-muted">({newUserDepts.length} selected)</span>}
+              </label>
               <select
-                id="new-user-dept"
-                value={newUserDept}
-                onChange={(e) => setNewUserDept(e.target.value)}
+                id="new-user-depts"
+                multiple
+                size={4}
+                value={newUserDepts}
+                onChange={(e) => {
+                  const selected = Array.from(e.target.selectedOptions, option => option.value);
+                  setNewUserDepts(selected);
+                }}
                 className={selectStyles + ' mt-1'}
               >
-                <option value="">Select a department</option>
                 {departments.map((n) => (
                   <option key={n} value={n}>{n}</option>
                 ))}
               </select>
+              <div className="text-xs text-base-content-muted dark:text-dark-content-muted mt-1">
+                Hold Ctrl/Cmd to select multiple departments
+              </div>
             </div>
           )}
           <div className="flex-grow min-w-[240px]">
@@ -243,7 +266,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
           <button
             type="submit"
             className="inline-flex items-center gap-x-2 rounded-md bg-brand-primary px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-primary/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-primary transition-colors disabled:opacity-50"
-            disabled={!newUserName.trim() || ((newUserRole !== 'admin' && newUserRole !== 'unit_head') && !newUserDept)}
+            disabled={!newUserName.trim() || ((newUserRole !== 'admin' && newUserRole !== 'unit_head') && newUserDepts.length === 0)}
           >
             <PlusIcon />
             Add User
@@ -281,14 +304,27 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
                     <div className="text-xs text-base-content-muted dark:text-dark-content-muted mt-1">Format: 6 digits → saved as 123456@kauveryhospital.com</div>
                   </div>
                   {(editRole !== 'admin' && editRole !== 'unit_head') && (
-                    <div className="min-w-[180px]">
-                      <label className="block text-xs font-medium leading-6 text-base-content dark:text-dark-content">Department</label>
-                      <select className={selectStyles + ' mt-1'} value={editDept} onChange={(e) => setEditDept(e.target.value)}>
-                        <option value="">Select a department</option>
+                    <div className="min-w-[250px]">
+                      <label className="block text-xs font-medium leading-6 text-base-content dark:text-dark-content">
+                        Departments {editDepts.length > 0 && <span className="text-xs text-base-content-muted dark:text-dark-content-muted">({editDepts.length} selected)</span>}
+                      </label>
+                      <select 
+                        multiple
+                        size={4}
+                        className={selectStyles + ' mt-1'} 
+                        value={editDepts} 
+                        onChange={(e) => {
+                          const selected = Array.from(e.target.selectedOptions, option => option.value);
+                          setEditDepts(selected);
+                        }}
+                      >
                         {departments.map((n) => (
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
+                      <div className="text-xs text-base-content-muted dark:text-dark-content-muted mt-1">
+                        Hold Ctrl/Cmd to select multiple departments
+                      </div>
                     </div>
                   )}
                   <div className="min-w-[240px]">
@@ -307,7 +343,7 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
                     <label htmlFor="edit-isunithead" className="text-xs text-base-content dark:text-dark-content">Is Unit Head</label>
                   </div>
                   <div className="flex items-center gap-2 ml-auto">
-                    <button onClick={saveEdit} disabled={!editName.trim() || ((editRole !== 'admin' && editRole !== 'unit_head') && !editDept)} className="px-3 py-1.5 text-sm rounded-md border bg-green-600 text-white hover:bg-green-500 transition-colors">Save</button>
+                    <button onClick={saveEdit} disabled={!editName.trim() || ((editRole !== 'admin' && editRole !== 'unit_head') && editDepts.length === 0)} className="px-3 py-1.5 text-sm rounded-md border bg-green-600 text-white hover:bg-green-500 transition-colors">Save</button>
                     <button onClick={cancelEdit} className="px-3 py-1.5 text-sm rounded-md border bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content hover:bg-base-300 dark:hover:bg-dark-200 transition-colors">Cancel</button>
                   </div>
                 </div>
@@ -317,7 +353,14 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
                     <span className="text-sm font-medium text-base-content dark:text-dark-content">{user.name}</span>
                     {user.email && <span className="block text-xs text-base-content-muted dark:text-dark-content-muted">{user.email}</span>}
                     {user.employeeId && <span className="block text-xs text-base-content-muted dark:text-dark-content-muted">Emp ID: {user.employeeId}</span>}
-                    <span className="block text-xs uppercase font-semibold text-base-content-muted dark:text-dark-content-muted">{user.role}{user.department ? ` • ${user.department}` : ''}</span>
+                    <span className="block text-xs uppercase font-semibold text-base-content-muted dark:text-dark-content-muted">
+                      {user.role}
+                      {(user as any).assignedDepartments 
+                        ? ` • ${(user as any).assignedDepartments}` 
+                        : user.department 
+                        ? ` • ${user.department}` 
+                        : ''}
+                    </span>
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => startEdit(user)} className="text-brand-primary hover:opacity-80 transition-colors" aria-label={`Edit ${user.name}`}>Edit</button>

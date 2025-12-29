@@ -9,6 +9,40 @@ interface RiskMatrixProps {
   onCellClick?: (impact: RiskImpact, likelihood: RiskLikelihood) => void;
 }
 
+// Normalize impact value (case-insensitive, trim whitespace)
+export const normalizeImpact = (value: any): RiskImpact => {
+  if (!value) return 'Moderate';
+  const normalized = String(value).trim();
+  const lower = normalized.toLowerCase();
+  
+  // Case-insensitive matching
+  for (const imp of IMPACTS) {
+    if (imp.toLowerCase() === lower) {
+      return imp;
+    }
+  }
+  
+  // Fallback to Moderate if no match
+  return 'Moderate';
+};
+
+// Normalize likelihood value (case-insensitive, trim whitespace)
+export const normalizeLikelihood = (value: any): RiskLikelihood => {
+  if (!value) return 'Possible';
+  const normalized = String(value).trim();
+  const lower = normalized.toLowerCase();
+  
+  // Case-insensitive matching
+  for (const lik of LIKELIHOODS) {
+    if (lik.toLowerCase() === lower) {
+      return lik;
+    }
+  }
+  
+  // Fallback to Possible if no match
+  return 'Possible';
+};
+
 const cellBg = (impact: RiskImpact, likelihood: RiskLikelihood) => {
   // Simple heatmap: higher impact/likelihood -> warmer
   const i = IMPACTS.indexOf(impact);
@@ -30,8 +64,8 @@ const RiskMatrix: React.FC<RiskMatrixProps> = ({ risks, onCellClick }) => {
       'Negligible': { 'Very likely': 0, 'Likely': 0, 'Possible': 0, 'Unlikely': 0, 'Very Unlikely': 0 },
     };
     for (const r of risks) {
-      const impact: RiskImpact = (IMPACTS as string[]).includes((r as any).impact) ? (r as any).impact : 'Moderate';
-      const likelihood: RiskLikelihood = (LIKELIHOODS as string[]).includes((r as any).likelihood) ? (r as any).likelihood : 'Possible';
+      const impact = normalizeImpact(r.impact);
+      const likelihood = normalizeLikelihood(r.likelihood);
       counts[impact][likelihood] += 1;
     }
     return counts;
@@ -71,7 +105,7 @@ const RiskMatrix: React.FC<RiskMatrixProps> = ({ risks, onCellClick }) => {
             <td className="px-3 py-2 text-sm font-semibold text-base-content dark:text-dark-content">Total</td>
             {LIKELIHOODS.map(l => (
               <td key={l} className="px-3 py-2 text-sm text-center text-base-content dark:text-dark-content">
-                {risks.filter(r => r.likelihood === l).length}
+                {IMPACTS.reduce((sum, imp) => sum + matrix[imp][l], 0)}
               </td>
             ))}
           </tr>

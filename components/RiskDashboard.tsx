@@ -3,7 +3,7 @@ import { Risk, Owner, User, Incident, IncidentHistory, RiskLikelihood, RiskImpac
 import RiskTable from './RiskTable';
 import RiskFormModal from './RiskFormModal';
 import { PlusIcon } from '../constants';
-import RiskMatrix from './RiskMatrix';
+import RiskMatrix, { normalizeImpact, normalizeLikelihood } from './RiskMatrix';
 import RiskIncidentHistoryModal from './RiskIncidentHistoryModal';
 import IncidentsTable from './IncidentsTable';
 import IncidentForm from './IncidentForm';
@@ -35,9 +35,16 @@ interface RiskDashboardProps {
   adminDeptOptions?: string[];
   adminDept?: string;
   onChangeAdminDept?: (v: string) => void;
+  // Manager/User department filters
+  managerDeptOptions?: string[];
+  managerDept?: string;
+  onChangeManagerDept?: (v: string) => void;
+  userDeptOptions?: string[];
+  userDept?: string;
+  onChangeUserDept?: (v: string) => void;
 }
 
-const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept }) => {
+const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [riskToEdit, setRiskToEdit] = useState<Risk | null>(null);
   const summary = aiSummary || '';
@@ -268,6 +275,38 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                   className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
                 >
                   {(adminDeptOptions.length ? adminDeptOptions : ['All']).map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          {currentUser?.role === 'manager' && managerDeptOptions.length > 0 && (
+            <div className="mt-8 flex items-center gap-3">
+              <label className="text-sm text-base-content dark:text-dark-content">
+                Department
+                <select
+                  value={managerDept}
+                  onChange={(e) => onChangeManagerDept && onChangeManagerDept(e.target.value)}
+                  className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
+                >
+                  {managerDeptOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+          {currentUser?.role === 'user' && userDeptOptions.length > 0 && (
+            <div className="mt-8 flex items-center gap-3">
+              <label className="text-sm text-base-content dark:text-dark-content">
+                Department
+                <select
+                  value={userDept}
+                  onChange={(e) => onChangeUserDept && onChangeUserDept(e.target.value)}
+                  className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
+                >
+                  {userDeptOptions.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
@@ -919,7 +958,13 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </thead>
             <tbody className="divide-y divide-base-300 dark:divide-dark-300">
               {risks
-                .filter(r => (!kpiImpactFilter || r.impact === kpiImpactFilter) && (!kpiLikelihoodFilter || r.likelihood === kpiLikelihoodFilter))
+                .filter(r => {
+                  const normalizedRiskImpact = normalizeImpact(r.impact);
+                  const normalizedRiskLikelihood = normalizeLikelihood(r.likelihood);
+                  const matchesImpact = !kpiImpactFilter || normalizedRiskImpact === kpiImpactFilter;
+                  const matchesLikelihood = !kpiLikelihoodFilter || normalizedRiskLikelihood === kpiLikelihoodFilter;
+                  return matchesImpact && matchesLikelihood;
+                })
                 .map(r => (
                   <tr key={r.id} className="hover:bg-base-100 dark:hover:bg-dark-100">
                     <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{r.riskNo || r.id}</td>
@@ -933,7 +978,13 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                     <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{new Date(r.updatedAt).toLocaleDateString()}</td>
                   </tr>
                 ))}
-              {risks.filter(r => (!kpiImpactFilter || r.impact === kpiImpactFilter) && (!kpiLikelihoodFilter || r.likelihood === kpiLikelihoodFilter)).length === 0 && (
+              {risks.filter(r => {
+                const normalizedRiskImpact = normalizeImpact(r.impact);
+                const normalizedRiskLikelihood = normalizeLikelihood(r.likelihood);
+                const matchesImpact = !kpiImpactFilter || normalizedRiskImpact === kpiImpactFilter;
+                const matchesLikelihood = !kpiLikelihoodFilter || normalizedRiskLikelihood === kpiLikelihoodFilter;
+                return matchesImpact && matchesLikelihood;
+              }).length === 0 && (
                 <tr>
                   <td colSpan={currentUser?.role === 'admin' ? 7 : 6} className="text-center py-6 text-base-content-muted dark:text-dark-content-muted">No risks found.</td>
                 </tr>
