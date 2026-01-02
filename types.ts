@@ -30,6 +30,7 @@ export interface User {
   unit?: string; // e.g., KCN, KTN, KCH
   isUnitHead?: boolean;
   employeeId?: string; // 6 digits + @kauveryhospital.com
+  assignedDepartments?: string[]; // Array of department names from UserDepartments table
 }
 
 export interface Risk {

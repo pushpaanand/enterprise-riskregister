@@ -1,6 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { apiUrl } from '../api';
 
+// Load jsPDF + autotable from CDN on demand
+async function getJsPDF(): Promise<any> {
+  // @ts-ignore
+  if (window.jspdf?.jsPDF) {
+    // @ts-ignore
+    return window.jspdf.jsPDF;
+  }
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js';
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load jsPDF'));
+    document.head.appendChild(s);
+  });
+  // @ts-ignore
+  return window.jspdf.jsPDF;
+}
+
+async function ensureAutoTable() {
+  // @ts-ignore
+  if ((window as any).jspdfAutotableLoaded) return;
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js';
+    s.async = true;
+    s.onload = () => {
+      // @ts-ignore
+      (window as any).jspdfAutotableLoaded = true;
+      resolve();
+    };
+    s.onerror = () => reject(new Error('Failed to load jsPDF Autotable'));
+    document.head.appendChild(s);
+  });
+}
+
 interface AuditLog {
   AuditLogId: string;
   TableName: string;
@@ -105,16 +141,91 @@ const AuditLogsPage: React.FC = () => {
     setOffset(0);
   };
 
+  const handleExportPDF = async () => {
+    try {
+      // Fetch all logs (not just current page) for PDF export
+      const params = new URLSearchParams();
+      if (tableNameFilter) params.append('tableName', tableNameFilter);
+      if (operationFilter) params.append('operation', operationFilter);
+      if (startDateFilter) params.append('startDate', startDateFilter);
+      if (endDateFilter) params.append('endDate', endDateFilter);
+      params.append('limit', '10000'); // Get all logs
+      params.append('offset', '0');
+
+      const response = await fetch(apiUrl('/audit-logs') + `?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch audit logs for export');
+      }
+      const data = await response.json();
+      const allLogs = data.logs || [];
+
+      const jsPDF = await getJsPDF();
+      await ensureAutoTable();
+      const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
+
+      const head = [['Timestamp', 'Table', 'Operation', 'Field', 'Old Value', 'New Value', 'Changed By', 'IP Address']];
+      const rows = allLogs.map((log: AuditLog) => [
+        formatDate(log.ChangedAtUtc),
+        log.TableName || '',
+        log.Operation || '',
+        log.FieldName || '-',
+        log.OldValue ? (log.OldValue.length > 50 ? log.OldValue.substring(0, 50) + '...' : log.OldValue) : '-',
+        log.NewValue ? (log.NewValue.length > 50 ? log.NewValue.substring(0, 50) + '...' : log.NewValue) : '-',
+        log.ChangedByUserName || log.ChangedByUserId || '-',
+        log.IPAddress || '-'
+      ]);
+
+      const columnStyles: Record<number, any> = {
+        0: { cellWidth: 100 }, // Timestamp
+        1: { cellWidth: 60 },  // Table
+        2: { cellWidth: 60 },  // Operation
+        3: { cellWidth: 70 },  // Field
+        4: { cellWidth: 120 }, // Old Value
+        5: { cellWidth: 120 }, // New Value
+        6: { cellWidth: 80 },  // Changed By
+        7: { cellWidth: 80 }   // IP Address
+      };
+
+      (doc as any).autoTable({
+        head,
+        body: rows,
+        startY: 40,
+        styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
+        bodyStyles: { valign: 'top', lineWidth: 0.5, lineColor: [230, 230, 230] },
+        tableWidth: 'auto',
+        columnStyles,
+        headStyles: { fillColor: [244, 244, 244], textColor: 20 },
+        margin: { left: 24, right: 24 },
+        didDrawPage: (data: any) => {
+          doc.setFontSize(14);
+          doc.text('Audit Logs Report', 24, 24);
+        }
+      });
+
+      doc.save('audit_logs_report.pdf');
+    } catch (err: any) {
+      alert('Failed to export PDF: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-base-content dark:text-dark-content">Audit Logs</h2>
-        <button
-          onClick={handleResetFilters}
-          className="px-4 py-2 text-sm font-medium text-base-content dark:text-dark-content bg-base-200 dark:bg-dark-200 hover:bg-base-300 dark:hover:bg-dark-300 rounded-md transition-colors"
-        >
-          Reset Filters
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportPDF}
+            className="px-4 py-2 text-sm font-medium text-base-content dark:text-dark-content bg-brand-primary hover:bg-brand-primary/90 text-white rounded-md transition-colors"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={handleResetFilters}
+            className="px-4 py-2 text-sm font-medium text-base-content dark:text-dark-content bg-base-200 dark:bg-dark-200 hover:bg-base-300 dark:hover:bg-dark-300 rounded-md transition-colors"
+          >
+            Reset Filters
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -210,30 +321,30 @@ const AuditLogsPage: React.FC = () => {
         <div className="overflow-x-auto">
           <div className="max-h-[70vh] overflow-y-auto">
             <table className="min-w-full divide-y divide-base-300 dark:divide-dark-300 bg-base-50 dark:bg-dark-50">
-              <thead className="sticky top-0 z-10 bg-base-100 dark:bg-dark-100">
+              <thead className="sticky top-0 z-10 bg-brand-secondary">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     Timestamp
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     Table
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     Operation
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     Field
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     Old Value
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     New Value
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     Changed By
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-base-content-muted dark:text-dark-content-muted uppercase tracking-wider border-b border-base-300 dark:border-dark-300">
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-brand-primary">
                     IP Address
                   </th>
                 </tr>

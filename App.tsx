@@ -90,6 +90,11 @@ const App: React.FC = () => {
     const [adminDept, setAdminDept] = useState<string>('');
     const [adminDeptOptions, setAdminDeptOptions] = useState<string[]>([]);
     const [adminStatus, setAdminStatus] = useState<'Open' | 'Closed' | 'All'>('All');
+    // Manager/User department filters
+    const [managerDeptOptions, setManagerDeptOptions] = useState<string[]>([]);
+    const [managerDept, setManagerDept] = useState<string>('All');
+    const [userDeptOptions, setUserDeptOptions] = useState<string[]>([]);
+    const [userDept, setUserDept] = useState<string>('All');
     const [incidents, setIncidents] = useState<Incident[]>(() => {
         const saved = localStorage.getItem('incidents');
         return saved ? JSON.parse(saved) : [];
@@ -226,10 +231,22 @@ const App: React.FC = () => {
                         console.log('Risks mapped (first 5)', mapped.slice(0,5).map((x:any)=>({riskNo:x.riskNo, identification:x.identification, status:x.status, dept:x.department})));
                         // Role-based scoping for user onboarding view
                         if (currentUser.role === 'user') {
-                            const ownRisks = mapped.filter((r: any) => r.createdByUserId === currentUser.id);
-                            setRisks(ownRisks);
-                        } else if (currentUser.role === 'manager' && currentUser.department) {
-                            setRisks(mapped.filter((r: any) => String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase()));
+                            let userRisks = mapped.filter((r: any) => r.createdByUserId === currentUser.id);
+                            // Filter by selected department if multiple departments assigned
+                            if (userDept && userDept !== 'All' && userDeptOptions.length > 1) {
+                                userRisks = userRisks.filter((r: any) => String(r.department || '').toLowerCase() === userDept.toLowerCase());
+                            }
+                            setRisks(userRisks);
+                        } else if (currentUser.role === 'manager') {
+                            let managerRisks = mapped;
+                            // Filter by selected department if multiple departments assigned
+                            if (managerDept && managerDept !== 'All' && managerDeptOptions.length > 1) {
+                                managerRisks = mapped.filter((r: any) => String(r.department || '').toLowerCase() === managerDept.toLowerCase());
+                            } else if (currentUser.department) {
+                                // Fallback to single department if no multi-dept selection
+                                managerRisks = mapped.filter((r: any) => String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase());
+                            }
+                            setRisks(managerRisks);
                         } else if (currentUser.role === 'unit_head') {
                             setRisks(mapped.filter((r: any) => isOperationsDepartment(r.department)));
                         } else if (currentUser.role === 'admin') {
@@ -423,9 +440,26 @@ const App: React.FC = () => {
                     unit: apiUser.Unit || apiUser.unit || undefined,
                     isUnitHead: Boolean(apiUser.IsUnitHead ?? apiUser.isUnitHead),
                     employeeId: apiUser.EmployeeId || apiUser.employeeId || undefined,
+                    assignedDepartments: apiUser.AssignedDepartments ? apiUser.AssignedDepartments.split(', ').filter(Boolean) : [],
                 }))
                 .filter((u: User) => Boolean(u.id && u.name));
             setUsers(mapped);
+            
+            // Set department options for current user if they have multiple departments
+            const currentUserData = mapped.find(u => u.id === currentUserId);
+            if (currentUserData) {
+                if (currentUserData.role === 'manager' && currentUserData.assignedDepartments && currentUserData.assignedDepartments.length > 1) {
+                    setManagerDeptOptions(['All', ...currentUserData.assignedDepartments]);
+                    if (!managerDept || managerDept === 'All') {
+                        setManagerDept('All');
+                    }
+                } else if (currentUserData.role === 'user' && currentUserData.assignedDepartments && currentUserData.assignedDepartments.length > 1) {
+                    setUserDeptOptions(['All', ...currentUserData.assignedDepartments]);
+                    if (!userDept || userDept === 'All') {
+                        setUserDept('All');
+                    }
+                }
+            }
             const targetId = focusUserId || currentUserId;
             if (targetId) {
                 const updatedCurrent = mapped.find(u => u.id === targetId);
@@ -1342,10 +1376,18 @@ const App: React.FC = () => {
                 ) : (
                     (() => {
                         // Filter by role
-                        if (currentUser.role === 'manager' && currentUser.department) {
-                            const dept = String(currentUser.department).toLowerCase();
-                            const filteredRisks = risks.filter(r => String(r.department || '').toLowerCase() === dept);
-                            const filteredOwners = owners.filter(o => String(o.department || '').toLowerCase() === dept);
+                        if (currentUser.role === 'manager') {
+                            let filteredRisks = risks;
+                            let deptFilter: string | null = null;
+                            // Filter by selected department if multiple departments assigned
+                            if (managerDept && managerDept !== 'All' && managerDeptOptions.length > 1) {
+                                deptFilter = managerDept.toLowerCase();
+                                filteredRisks = risks.filter(r => String(r.department || '').toLowerCase() === deptFilter);
+                            } else if (currentUser.department) {
+                                deptFilter = String(currentUser.department).toLowerCase();
+                                filteredRisks = risks.filter(r => String(r.department || '').toLowerCase() === deptFilter);
+                            }
+                            const filteredOwners = deptFilter ? owners.filter(o => String(o.department || '').toLowerCase() === deptFilter) : owners;
                             if (managerView === 'reports') {
                                 const deptOptions = ['All', ...Array.from(new Set(filteredRisks.map(r => (r.department || '').toString()).filter(Boolean))) as string[]];
                                 const deptIncidents = incidents.filter(i => filteredRisks.some(fr => fr.id === i.riskId));
@@ -1366,6 +1408,12 @@ const App: React.FC = () => {
                                     currentUser={currentUser}
                                     onSaveRisk={handleSaveRisk}
                                     onDeleteRisk={handleDeleteRisk}
+                                    managerDeptOptions={managerDeptOptions}
+                                    managerDept={managerDept}
+                                    onChangeManagerDept={setManagerDept}
+                                    userDeptOptions={userDeptOptions}
+                                    userDept={userDept}
+                                    onChangeUserDept={setUserDept}
                                     onApproveRisk={(risk) => handleSaveRisk({
                                         id: risk.id,
                                         description: risk.description,
