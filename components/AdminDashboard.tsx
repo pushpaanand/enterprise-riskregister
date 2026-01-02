@@ -3,6 +3,7 @@ import { User } from '../types';
 import UserAdminPage from './UserAdminPage';
 import DepartmentAdminPage from './DepartmentAdminPage';
 import UnitHeadMailer, { ManagerMailer } from './UnitHeadMailer';
+import AuditLogsPage from './AuditLogsPage';
 
 interface AdminDashboardProps {
     users: User[];
@@ -11,7 +12,7 @@ interface AdminDashboardProps {
     onUpdateUser?: (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => void;
 }
 
-type AdminTab = 'users' | 'departments' | 'email' | 'emailManagers';
+type AdminTab = 'users' | 'departments' | 'email' | 'emailManagers' | 'auditLogs';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -60,6 +61,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     >
                         Email Managers
                     </button>
+                    <button
+                        onClick={() => setActiveTab('auditLogs')}
+                        className={`${
+                            activeTab === 'auditLogs'
+                                ? 'border-brand-primary text-brand-primary'
+                                : 'border-transparent text-base-content-muted dark:text-dark-content-muted hover:border-gray-300 dark:hover:border-gray-700 hover:text-base-content dark:hover:text-dark-content'
+                        } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium transition-colors`}
+                    >
+                        Audit Logs
+                    </button>
                 </nav>
             </div>
 
@@ -80,6 +91,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 )}
                 {activeTab === 'emailManagers' && (
                     <ManagerMailer />
+                )}
+                {activeTab === 'auditLogs' && (
+                    <AuditLogsPage />
                 )}
             </div>
         </div>
