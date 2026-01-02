@@ -58,9 +58,9 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
   const totalColumns = showActions ? baseColumns + 1 : baseColumns;
 
   return (
-    <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow w-full overflow-x-auto">
+    <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow w-full overflow-x-auto max-h-[70vh] overflow-y-auto">
       <table className="w-full min-w-[1800px] divide-y divide-base-300 dark:divide-dark-300">
-        <thead className="bg-brand-secondary">
+        <thead className="bg-brand-secondary sticky top-0 z-10">
           <tr>
             <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-brand-primary sm:pl-6 w-32">Risk ID</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary w-48">Category</th>

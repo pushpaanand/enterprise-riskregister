@@ -585,7 +585,7 @@ const App: React.FC = () => {
         if (riskData.id) {
             // Edit -> persist to backend
             try {
-                await fetch(apiUrl(`/risks/${riskData.id}`), {
+                const response = await fetch(apiUrl(`/risks/${riskData.id}`), {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -602,13 +602,25 @@ const App: React.FC = () => {
                         changedByUserId: currentUser?.id,
                     })
                 });
+                const result = await response.json();
+                
+                // If user edit is pending approval, show message and don't update local state
+                if (result.pendingApproval && currentUser?.role === 'user') {
+                    // eslint-disable-next-line no-alert
+                    alert(result.message || 'Your changes have been submitted for manager approval. The risk will be updated after approval.');
+                    return; // Don't update local state - wait for approval
+                }
             } catch (e) {
                 // eslint-disable-next-line no-console
                 console.error('Failed to update risk in backend', e);
             }
-            const timestamp = new Date().toISOString();
-            setRisks(prev => prev.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: timestamp } : r));
-            setAllRisks(prev => prev.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: timestamp } : r));
+            
+            // Only update local state if not pending approval (manager/admin edits or after approval)
+            if (currentUser?.role !== 'user') {
+                const timestamp = new Date().toISOString();
+                setRisks(prev => prev.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: timestamp } : r));
+                setAllRisks(prev => prev.map(r => r.id === riskData.id ? { ...r, ...riskData, updatedAt: timestamp } : r));
+            }
         } else {
             // Add
             // Determine department (prefer risk selection, then user's department)

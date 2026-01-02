@@ -18,9 +18,9 @@ const IncidentsTable: React.FC<IncidentsTableProps> = ({ incidents, risks, curre
   const riskNoFor = (riskId: string) => risks.find(r => r.id === riskId)?.riskNo || riskId;
 
   return (
-    <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow w-full">
+    <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow w-full overflow-x-auto max-h-[70vh] overflow-y-auto">
       <table className="w-full divide-y divide-base-300 dark:divide-dark-300 table-auto">
-        <thead className="bg-brand-secondary">
+        <thead className="bg-brand-secondary sticky top-0 z-10">
           <tr>
             <th className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-brand-primary sm:pl-6">Incident Summary</th>
             <th className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Risk Number</th>
