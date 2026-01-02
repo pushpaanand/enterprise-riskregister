@@ -63,8 +63,8 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
         <thead className="bg-brand-secondary sticky top-0 z-10">
           <tr>
             <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-brand-primary sm:pl-6 w-32">Risk ID</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary min-w-[200px]">Category</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary min-w-[300px]">Risk Description</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary w-32">Category</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary min-w-[400px]">Risk Description</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Impact</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Likelihood</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Identification</th>
@@ -85,8 +85,8 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
           {risks.map((risk) => (
             <tr key={risk.id} onClick={() => onRowClick && onRowClick(risk)} className={onRowClick ? 'cursor-pointer hover:bg-base-100 dark:hover:bg-dark-100' : ''}>
               <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 text-base-content dark:text-dark-content">{risk.riskNo || risk.id}</td>
-              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content min-w-[200px]">{risk.category || '-'}</td>
-              <td className="whitespace-normal px-3 py-4 text-sm">
+              <td className="whitespace-normal px-3 py-4 text-sm text-base-content dark:text-dark-content w-32">{risk.category || '-'}</td>
+              <td className="whitespace-normal px-3 py-4 text-sm min-w-[400px]">
                 <div className="text-base-content dark:text-dark-content break-words max-w-none">{risk.description}</div>
               </td>
               <td className="whitespace-nowrap px-3 py-4 text-sm">
