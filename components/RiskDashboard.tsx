@@ -42,9 +42,11 @@ interface RiskDashboardProps {
   userDeptOptions?: string[];
   userDept?: string;
   onChangeUserDept?: (v: string) => void;
+  // Edit status for user's risk edits
+  editStatuses?: Record<string, any>;
 }
 
-const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept }) => {
+const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept, editStatuses = {} }) => {
   // Debug logging
   React.useEffect(() => {
     // eslint-disable-next-line no-console
@@ -468,6 +470,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             onApprove={onApproveRisk}
                   onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
             onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+            editStatuses={editStatuses}
             incidentCounts={(() => {
               const counts: Record<string, number> = {};
               (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
@@ -563,6 +566,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             onApprove={onApproveRisk}
                   onReject={(risk) => { setRejectTarget(risk); setRejectReason(''); }}
             onRowClick={(risk) => { setActiveTab('incidents'); openIncidentForRisk(risk); }}
+            editStatuses={editStatuses}
             incidentCounts={(() => {
               const counts: Record<string, number> = {};
               (incidents || []).forEach(i => { counts[i.riskId] = (counts[i.riskId] || 0) + 1; });
