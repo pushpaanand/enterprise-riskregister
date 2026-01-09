@@ -448,13 +448,21 @@ const App: React.FC = () => {
             // Set department options for current user if they have multiple departments
             const currentUserData = mapped.find(u => u.id === currentUserId);
             if (currentUserData) {
+                // eslint-disable-next-line no-console
+                console.log('syncUsersFromApi - currentUserData:', currentUserData.role, 'assignedDepartments:', currentUserData.assignedDepartments);
                 if (currentUserData.role === 'manager' && currentUserData.assignedDepartments && currentUserData.assignedDepartments.length > 1) {
-                    setManagerDeptOptions(['All', ...currentUserData.assignedDepartments]);
+                    const options = ['All', ...currentUserData.assignedDepartments];
+                    setManagerDeptOptions(options);
+                    // eslint-disable-next-line no-console
+                    console.log('syncUsersFromApi - Manager dept options set:', options);
                     if (!managerDept || managerDept === 'All') {
                         setManagerDept('All');
                     }
                 } else if (currentUserData.role === 'user' && currentUserData.assignedDepartments && currentUserData.assignedDepartments.length > 1) {
-                    setUserDeptOptions(['All', ...currentUserData.assignedDepartments]);
+                    const options = ['All', ...currentUserData.assignedDepartments];
+                    setUserDeptOptions(options);
+                    // eslint-disable-next-line no-console
+                    console.log('syncUsersFromApi - User dept options set:', options);
                     if (!userDept || userDept === 'All') {
                         setUserDept('All');
                     }
@@ -488,13 +496,22 @@ const App: React.FC = () => {
             return;
         }
 
+        // eslint-disable-next-line no-console
+        console.log('Setting dept options for user:', currentUser.role, 'assignedDepartments:', currentUser.assignedDepartments);
+
         if (currentUser.role === 'manager' && currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
-            setManagerDeptOptions(['All', ...currentUser.assignedDepartments]);
+            const options = ['All', ...currentUser.assignedDepartments];
+            setManagerDeptOptions(options);
+            // eslint-disable-next-line no-console
+            console.log('Manager dept options set:', options);
             if (!managerDept || managerDept === 'All') {
                 setManagerDept('All');
             }
         } else if (currentUser.role === 'user' && currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
-            setUserDeptOptions(['All', ...currentUser.assignedDepartments]);
+            const options = ['All', ...currentUser.assignedDepartments];
+            setUserDeptOptions(options);
+            // eslint-disable-next-line no-console
+            console.log('User dept options set:', options);
             if (!userDept || userDept === 'All') {
                 setUserDept('All');
             }

@@ -45,6 +45,12 @@ interface RiskDashboardProps {
 }
 
 const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept }) => {
+  // Debug logging
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('RiskDashboard - currentUser role:', currentUser?.role, 'managerDeptOptions:', managerDeptOptions, 'userDeptOptions:', userDeptOptions);
+  }, [currentUser, managerDeptOptions, userDeptOptions]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [riskToEdit, setRiskToEdit] = useState<Risk | null>(null);
   const summary = aiSummary || '';
@@ -363,8 +369,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       {activeTab === 'risks' ? (
         <div className="mt-8">
           {/* Department Dropdown for Managers/Users with multiple departments */}
-          {((currentUser?.role === 'manager' && managerDeptOptions.filter(opt => opt !== 'All').length > 1) || 
-            (currentUser?.role === 'user' && userDeptOptions.filter(opt => opt !== 'All').length > 1)) ? (
+          {((currentUser?.role === 'manager' && managerDeptOptions.length > 1) || 
+            (currentUser?.role === 'user' && userDeptOptions.length > 1)) ? (
             <div className="mb-4 flex items-center gap-2">
               <label className="text-sm font-medium text-base-content dark:text-dark-content">Department:</label>
               <select
