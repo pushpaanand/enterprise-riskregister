@@ -522,34 +522,61 @@ const App: React.FC = () => {
             return;
         }
 
-        // eslint-disable-next-line no-console
-        console.log('Setting dept options for user:', currentUser.role, 'assignedDepartments:', currentUser.assignedDepartments);
-
-        if (currentUser.role === 'manager' && currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
-            const options = ['All', ...currentUser.assignedDepartments];
-            setManagerDeptOptions(options);
-            // eslint-disable-next-line no-console
-            console.log('Manager dept options set:', options);
-            if (!managerDept || managerDept === 'All') {
-                setManagerDept('All');
-            }
-        } else if (currentUser.role === 'user' && currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
-            const options = ['All', ...currentUser.assignedDepartments];
-            setUserDeptOptions(options);
-            // eslint-disable-next-line no-console
-            console.log('User dept options set:', options);
-            if (!userDept || userDept === 'All') {
-                setUserDept('All');
-            }
+        // Fetch departments directly from API to ensure we have the latest data (includes departments from Risks table)
+        if ((currentUser.role === 'manager' || currentUser.role === 'user') && currentUser.id) {
+            (async () => {
+                try {
+                    const res = await fetch(apiUrl(`/users/${currentUser.id}/departments`));
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (Array.isArray(data)) {
+                            const deptNames = data.map((d: any) => d.Department).filter(Boolean);
+                            // eslint-disable-next-line no-console
+                            console.log('Fetched departments for user:', currentUser.role, 'departments:', deptNames);
+                            
+                            if (deptNames.length > 1) {
+                                const options = ['All', ...deptNames];
+                                if (currentUser.role === 'manager') {
+                                    setManagerDeptOptions(options);
+                                    if (!managerDept || managerDept === 'All') {
+                                        setManagerDept('All');
+                                    }
+                                } else if (currentUser.role === 'user') {
+                                    setUserDeptOptions(options);
+                                    if (!userDept || userDept === 'All') {
+                                        setUserDept('All');
+                                    }
+                                }
+                            } else {
+                                // Clear options if user doesn't have multiple departments
+                                if (currentUser.role === 'manager') {
+                                    setManagerDeptOptions([]);
+                                    setManagerDept('All');
+                                } else if (currentUser.role === 'user') {
+                                    setUserDeptOptions([]);
+                                    setUserDept('All');
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to fetch user departments', e);
+                    // Fallback to assignedDepartments from currentUser
+                    if (currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
+                        const options = ['All', ...currentUser.assignedDepartments];
+                        if (currentUser.role === 'manager') {
+                            setManagerDeptOptions(options);
+                        } else if (currentUser.role === 'user') {
+                            setUserDeptOptions(options);
+                        }
+                    }
+                }
+            })();
         } else {
-            // Clear options if user doesn't have multiple departments
-            if (currentUser.role === 'manager') {
-                setManagerDeptOptions([]);
-                setManagerDept('All');
-            } else if (currentUser.role === 'user') {
-                setUserDeptOptions([]);
-                setUserDept('All');
-            }
+            // Clear options for admin/unit_head
+            setManagerDeptOptions([]);
+            setUserDeptOptions([]);
         }
     }, [currentUser]);
 
