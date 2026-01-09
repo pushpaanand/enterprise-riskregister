@@ -363,7 +363,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       {activeTab === 'risks' ? (
         <div className="mt-8">
           {/* Department Dropdown for Managers/Users with multiple departments */}
-          {(currentUser?.role === 'manager' && managerDeptOptions.length > 1) || (currentUser?.role === 'user' && userDeptOptions.length > 1) ? (
+          {((currentUser?.role === 'manager' && managerDeptOptions.filter(opt => opt !== 'All').length > 1) || 
+            (currentUser?.role === 'user' && userDeptOptions.filter(opt => opt !== 'All').length > 1)) ? (
             <div className="mb-4 flex items-center gap-2">
               <label className="text-sm font-medium text-base-content dark:text-dark-content">Department:</label>
               <select

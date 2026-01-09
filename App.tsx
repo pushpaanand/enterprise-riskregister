@@ -480,6 +480,36 @@ const App: React.FC = () => {
         syncUsersFromApi(currentUserId);
     }, [currentUserId, syncUsersFromApi]);
 
+    // Set department options when currentUser changes (for login or direct updates)
+    useEffect(() => {
+        if (!currentUser) {
+            setManagerDeptOptions([]);
+            setUserDeptOptions([]);
+            return;
+        }
+
+        if (currentUser.role === 'manager' && currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
+            setManagerDeptOptions(['All', ...currentUser.assignedDepartments]);
+            if (!managerDept || managerDept === 'All') {
+                setManagerDept('All');
+            }
+        } else if (currentUser.role === 'user' && currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
+            setUserDeptOptions(['All', ...currentUser.assignedDepartments]);
+            if (!userDept || userDept === 'All') {
+                setUserDept('All');
+            }
+        } else {
+            // Clear options if user doesn't have multiple departments
+            if (currentUser.role === 'manager') {
+                setManagerDeptOptions([]);
+                setManagerDept('All');
+            } else if (currentUser.role === 'user') {
+                setUserDeptOptions([]);
+                setUserDept('All');
+            }
+        }
+    }, [currentUser]);
+
     useEffect(() => {
         if (!pendingLinkAction) return;
         if (!currentUser) return;
