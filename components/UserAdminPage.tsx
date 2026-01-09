@@ -219,27 +219,32 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
             </select>
           </div>
           {(newUserRole !== 'admin' && newUserRole !== 'unit_head') && (
-            <div className="flex-grow min-w-[250px]">
-              <label htmlFor="new-user-depts" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">
+            <div className="flex-grow min-w-[300px]">
+              <label className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content mb-2">
                 Departments {newUserDepts.length > 0 && <span className="text-xs text-base-content-muted dark:text-dark-content-muted">({newUserDepts.length} selected)</span>}
               </label>
-              <select
-                id="new-user-depts"
-                multiple
-                size={4}
-                value={newUserDepts}
-                onChange={(e) => {
-                  const selected = Array.from(e.target.selectedOptions, option => option.value);
-                  setNewUserDepts(selected);
-                }}
-                className={selectStyles + ' mt-1'}
-              >
-                {departments.map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-              <div className="text-xs text-base-content-muted dark:text-dark-content-muted mt-1">
-                Hold Ctrl/Cmd to select multiple departments
+              <div className="max-h-48 overflow-y-auto border border-base-300 dark:border-dark-300 rounded-md p-2 bg-base-100 dark:bg-dark-100">
+                {departments.length === 0 ? (
+                  <div className="text-xs text-base-content-muted dark:text-dark-content-muted">Loading departments...</div>
+                ) : (
+                  departments.map((dept) => (
+                    <label key={dept} className="flex items-center gap-2 py-1 hover:bg-base-200 dark:hover:bg-dark-200 px-2 rounded cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newUserDepts.includes(dept)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setNewUserDepts([...newUserDepts, dept]);
+                          } else {
+                            setNewUserDepts(newUserDepts.filter(d => d !== dept));
+                          }
+                        }}
+                        className="accent-brand-primary"
+                      />
+                      <span className="text-sm text-base-content dark:text-dark-content">{dept}</span>
+                    </label>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -304,26 +309,32 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
                     <div className="text-xs text-base-content-muted dark:text-dark-content-muted mt-1">Format: 6 digits → saved as 123456@kauveryhospital.com</div>
                   </div>
                   {(editRole !== 'admin' && editRole !== 'unit_head') && (
-                    <div className="min-w-[250px]">
-                      <label className="block text-xs font-medium leading-6 text-base-content dark:text-dark-content">
+                    <div className="min-w-[300px]">
+                      <label className="block text-xs font-medium leading-6 text-base-content dark:text-dark-content mb-2">
                         Departments {editDepts.length > 0 && <span className="text-xs text-base-content-muted dark:text-dark-content-muted">({editDepts.length} selected)</span>}
                       </label>
-                      <select 
-                        multiple
-                        size={4}
-                        className={selectStyles + ' mt-1'} 
-                        value={editDepts} 
-                        onChange={(e) => {
-                          const selected = Array.from(e.target.selectedOptions, option => option.value);
-                          setEditDepts(selected);
-                        }}
-                      >
-                        {departments.map((n) => (
-                          <option key={n} value={n}>{n}</option>
-                        ))}
-                      </select>
-                      <div className="text-xs text-base-content-muted dark:text-dark-content-muted mt-1">
-                        Hold Ctrl/Cmd to select multiple departments
+                      <div className="max-h-48 overflow-y-auto border border-base-300 dark:border-dark-300 rounded-md p-2 bg-base-100 dark:bg-dark-100">
+                        {departments.length === 0 ? (
+                          <div className="text-xs text-base-content-muted dark:text-dark-content-muted">Loading departments...</div>
+                        ) : (
+                          departments.map((dept) => (
+                            <label key={dept} className="flex items-center gap-2 py-1 hover:bg-base-200 dark:hover:bg-dark-200 px-2 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editDepts.includes(dept)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEditDepts([...editDepts, dept]);
+                                  } else {
+                                    setEditDepts(editDepts.filter(d => d !== dept));
+                                  }
+                                }}
+                                className="accent-brand-primary"
+                              />
+                              <span className="text-xs text-base-content dark:text-dark-content">{dept}</span>
+                            </label>
+                          ))
+                        )}
                       </div>
                     </div>
                   )}

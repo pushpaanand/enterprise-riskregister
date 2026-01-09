@@ -1,5 +1,5 @@
 import React, { useState, useEffect, FormEvent } from 'react';
-import { Risk, Owner, RiskImpact, RiskLikelihood, RiskStatus } from '../types';
+import { Risk, Owner, RiskImpact, RiskLikelihood, RiskStatus, User } from '../types';
 import Modal from './ui/Modal';
 
 interface RiskFormModalProps {
@@ -8,11 +8,13 @@ interface RiskFormModalProps {
   onSave: (risk: Omit<Risk, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => void;
   riskToEdit?: Risk | null;
   owners: Owner[];
+  currentUser?: User | null;
+  userDeptOptions?: string[];
 }
 
 // Removed AI generation
 
-const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, riskToEdit, owners }) => {
+const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, riskToEdit, owners, currentUser, userDeptOptions = [] }) => {
   const [description, setDescription] = useState('');
   const [impact, setImpact] = useState<RiskImpact>('Moderate');
   const [likelihood, setLikelihood] = useState<RiskLikelihood>('Possible');
@@ -24,7 +26,11 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
   const [identification, setIdentification] = useState<'Inherent risk' | 'Residual risk'>('Inherent risk');
   const [planOfAction, setPlanOfAction] = useState<string>('');
   const [riskIndicator, setRiskIndicator] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   // classification status removed per request; keep lifecycle status only
+  
+  // Show department dropdown if user has multiple departments
+  const showDeptDropdown = currentUser?.role === 'user' && userDeptOptions.length > 1;
 
   useEffect(() => {
     if (riskToEdit) {
@@ -39,6 +45,7 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       setSubcategory(riskToEdit.subcategory || '');
       setPlanOfAction(riskToEdit.planOfAction || '');
       setRiskIndicator(riskToEdit.riskIndicator || '');
+      setSelectedDepartment(riskToEdit.department || '');
     } else {
       // Reset form when opening for a new risk
       setDescription('');
@@ -52,8 +59,14 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       setOwnerId(owners[0]?.id || '');
       setPlanOfAction('');
       setRiskIndicator('');
+      // Set default department to first option or current user's department
+      if (showDeptDropdown && userDeptOptions.length > 0) {
+        setSelectedDepartment(userDeptOptions[0] === 'All' && userDeptOptions.length > 1 ? userDeptOptions[1] : userDeptOptions[0]);
+      } else {
+        setSelectedDepartment(currentUser?.department || '');
+      }
     }
-  }, [riskToEdit, isOpen, owners]);
+  }, [riskToEdit, isOpen, owners, showDeptDropdown, userDeptOptions, currentUser]);
   
   // Owner selection is hidden; keep internal state but not required
 
@@ -72,7 +85,8 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
       likelihood,
       status,
       ownerId,
-    });
+      department: showDeptDropdown && selectedDepartment ? selectedDepartment : undefined,
+    } as any);
     onClose();
   };
 
@@ -96,6 +110,25 @@ const RiskFormModal: React.FC<RiskFormModalProps> = ({ isOpen, onClose, onSave, 
             />
           </div>
         </div>
+
+        {showDeptDropdown && !riskToEdit && (
+          <div>
+            <label htmlFor="department" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Department</label>
+            <div className="mt-2">
+              <select 
+                id="department" 
+                value={selectedDepartment} 
+                onChange={(e) => setSelectedDepartment(e.target.value)} 
+                className={selectStyles}
+                required
+              >
+                {userDeptOptions.filter(opt => opt !== 'All').map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         <div>
           <label htmlFor="category" className="block text-sm font-medium leading-6 text-base-content dark:text-dark-content">Category</label>

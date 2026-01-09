@@ -945,6 +945,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
         onSave={onSaveRisk}
         riskToEdit={riskToEdit}
         owners={owners}
+        currentUser={currentUser}
+        userDeptOptions={userDeptOptions}
       />
 
       {/* Inline incident form replaces modal */}

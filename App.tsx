@@ -963,17 +963,35 @@ const App: React.FC = () => {
     };
     
     // User CRUD
-    const handleAddUser = async (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => {
+    const handleAddUser = async (name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => {
         try {
+            // Use first department for the main DepartmentId field (for backward compatibility)
+            const primaryDepartment = Array.isArray(departments) && departments.length > 0 ? departments[0] : undefined;
+            
             const res = await fetch(apiUrl('/users'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, role, department, email, unit, isUnitHead, employeeId })
+                body: JSON.stringify({ name, role, department: primaryDepartment, email, unit, isUnitHead, employeeId })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || 'Failed to create user');
             const apiUser = data.user as any;
-        const newUser: User = {
+            
+            // Assign multiple departments if provided
+            if (Array.isArray(departments) && departments.length > 0 && (role === 'user' || role === 'manager')) {
+                try {
+                    await fetch(apiUrl(`/users/${apiUser.UserId}/departments`), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ departmentNames: departments })
+                    });
+                } catch (deptErr) {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to assign departments', deptErr);
+                }
+            }
+            
+            const newUser: User = {
                 id: apiUser.UserId,
                 name: apiUser.Name,
                 email: apiUser.Email || undefined,
@@ -1039,15 +1057,45 @@ const App: React.FC = () => {
         }
     };
 
-    const handleUpdateUser = async (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', department?: string, email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => {
+    const handleUpdateUser = async (id: string, name: string, role: 'user' | 'manager' | 'admin' | 'unit_head', departments?: string[], email?: string, unit?: string, isUnitHead?: boolean, employeeId?: string) => {
         try {
+            // Use first department for the main DepartmentId field (for backward compatibility)
+            const primaryDepartment = Array.isArray(departments) && departments.length > 0 ? departments[0] : undefined;
+            
             const res = await fetch(apiUrl(`/users/${id}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, role, department, email, unit, isUnitHead, employeeId })
+                body: JSON.stringify({ name, role, department: primaryDepartment, email, unit, isUnitHead, employeeId })
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data?.error || 'Failed to update user');
+            
+            // Update multiple departments if provided
+            if (Array.isArray(departments) && (role === 'user' || role === 'manager')) {
+                try {
+                    await fetch(apiUrl(`/users/${id}/departments`), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ departmentNames: departments })
+                    });
+                } catch (deptErr) {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to update departments', deptErr);
+                }
+            } else if (role === 'admin' || role === 'unit_head') {
+                // Clear departments for admin/unit_head
+                try {
+                    await fetch(apiUrl(`/users/${id}/departments`), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ departmentNames: [] })
+                    });
+                } catch (deptErr) {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to clear departments', deptErr);
+                }
+            }
+            
             const apiUser = data.user as any;
             const updated: User = {
                 id: apiUser.UserId,
