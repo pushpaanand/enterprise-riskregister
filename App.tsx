@@ -235,7 +235,7 @@ const App: React.FC = () => {
                         if (currentUser.role === 'user') {
                             let userRisks = mapped.filter((r: any) => r.createdByUserId === currentUser.id);
                             // Filter by selected department if multiple departments assigned
-                            if (userDept && userDept !== 'All' && userDeptOptions.length > 1) {
+                            if (userDept && userDept !== 'All' && userDeptOptions.length >= 2) {
                                 userRisks = userRisks.filter((r: any) => String(r.department || '').toLowerCase() === userDept.toLowerCase());
                             }
                             setRisks(userRisks);
@@ -1565,7 +1565,7 @@ const App: React.FC = () => {
                             let filteredRisks = risks;
                             let deptFilter: string | null = null;
                             // Filter by selected department if multiple departments assigned
-                            if (managerDept && managerDept !== 'All' && managerDeptOptions.length > 1) {
+                            if (managerDept && managerDept !== 'All' && managerDeptOptions.length >= 2) {
                                 deptFilter = managerDept.toLowerCase();
                                 filteredRisks = risks.filter(r => String(r.department || '').toLowerCase() === deptFilter);
                             } else if (currentUser.department) {

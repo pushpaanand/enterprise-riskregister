@@ -48,22 +48,29 @@ interface RiskDashboardProps {
 
 const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept, editStatuses = {} }) => {
   // Debug logging
+  // Derive effective department options (fallback to assignedDepartments if needed)
+  const effectiveManagerDepts = React.useMemo(() => {
+    if (managerDeptOptions && managerDeptOptions.length >= 2) return managerDeptOptions;
+    if (currentUser?.role === 'manager' && currentUser?.assignedDepartments?.length >= 2) {
+      return ['All', ...currentUser.assignedDepartments];
+    }
+    return managerDeptOptions || [];
+  }, [managerDeptOptions, currentUser]);
+
+  const effectiveUserDepts = React.useMemo(() => {
+    if (userDeptOptions && userDeptOptions.length >= 2) return userDeptOptions;
+    if (currentUser?.role === 'user' && currentUser?.assignedDepartments?.length >= 2) {
+      return ['All', ...currentUser.assignedDepartments];
+    }
+    return userDeptOptions || [];
+  }, [userDeptOptions, currentUser]);
+
   React.useEffect(() => {
     // eslint-disable-next-line no-console
     console.log('RiskDashboard - currentUser role:', currentUser?.role, 'managerDeptOptions:', managerDeptOptions, 'length:', managerDeptOptions.length, 'userDeptOptions:', userDeptOptions, 'length:', userDeptOptions.length);
     // eslint-disable-next-line no-console
-    console.log('RiskDashboard - Should show manager dropdown:', currentUser?.role === 'manager' && managerDeptOptions.length >= 2, 'condition breakdown:', {
-      isManager: currentUser?.role === 'manager',
-      optionsLength: managerDeptOptions.length,
-      lengthCheck: managerDeptOptions.length >= 2
-    });
-    // eslint-disable-next-line no-console
-    console.log('RiskDashboard - Should show user dropdown:', currentUser?.role === 'user' && userDeptOptions.length >= 2, 'condition breakdown:', {
-      isUser: currentUser?.role === 'user',
-      optionsLength: userDeptOptions.length,
-      lengthCheck: userDeptOptions.length >= 2
-    });
-  }, [currentUser, managerDeptOptions, userDeptOptions]);
+    console.log('RiskDashboard - Effective manager options length:', effectiveManagerDepts.length, 'Effective user options length:', effectiveUserDepts.length);
+  }, [currentUser, managerDeptOptions, userDeptOptions, effectiveManagerDepts, effectiveUserDepts]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [riskToEdit, setRiskToEdit] = useState<Risk | null>(null);
@@ -301,7 +308,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </label>
             </div>
           )}
-          {currentUser?.role === 'manager' && managerDeptOptions.length >= 2 && (
+          {currentUser?.role === 'manager' && effectiveManagerDepts.length >= 2 && (
             <div className="mt-8 flex items-center gap-3">
               <label className="text-sm text-base-content dark:text-dark-content">
                 Department
@@ -310,14 +317,14 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                   onChange={(e) => onChangeManagerDept && onChangeManagerDept(e.target.value)}
                   className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
                 >
-                  {managerDeptOptions.map(opt => (
+                  {effectiveManagerDepts.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
               </label>
             </div>
           )}
-          {currentUser?.role === 'user' && userDeptOptions.length >= 2 && (
+          {currentUser?.role === 'user' && effectiveUserDepts.length >= 2 && (
             <div className="mt-8 flex items-center gap-3">
               <label className="text-sm text-base-content dark:text-dark-content">
                 Department
@@ -326,7 +333,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                   onChange={(e) => onChangeUserDept && onChangeUserDept(e.target.value)}
                   className="ml-2 rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-2 py-1.5 text-sm"
                 >
-                  {userDeptOptions.map(opt => (
+                  {effectiveUserDepts.map(opt => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
@@ -383,8 +390,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       {activeTab === 'risks' ? (
         <div className="mt-8">
           {/* Department Dropdown for Managers/Users with multiple departments */}
-          {((currentUser?.role === 'manager' && managerDeptOptions.length >= 2) || 
-            (currentUser?.role === 'user' && userDeptOptions.length >= 2)) ? (
+          {((currentUser?.role === 'manager' && effectiveManagerDepts.length >= 2) || 
+            (currentUser?.role === 'user' && effectiveUserDepts.length >= 2)) ? (
             <div className="mb-4 flex items-center gap-2">
               <label className="text-sm font-medium text-base-content dark:text-dark-content">Department:</label>
               <select
@@ -398,7 +405,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 }}
                 className={filterInputStyles}
               >
-                {(currentUser?.role === 'manager' ? managerDeptOptions : userDeptOptions).map(opt => (
+                {(currentUser?.role === 'manager' ? effectiveManagerDepts : effectiveUserDepts).map(opt => (
                   <option key={opt} value={opt}>{opt}</option>
                 ))}
               </select>
