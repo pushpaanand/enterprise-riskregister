@@ -31,10 +31,17 @@ const Login: React.FC<LoginProps> = ({ users, onLogin }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Login failed');
       const apiUser = data.user as any;
+      const normalizeRole = (input: unknown): User['role'] => {
+        const value = typeof input === 'string' ? input.toLowerCase() : 'user';
+        if (value === 'admin' || value === 'manager' || value === 'unit_head' || value === 'user') {
+          return value as User['role'];
+        }
+        return 'user';
+      };
       const selectedUser: User = {
         id: apiUser.UserId,
         name: apiUser.Name,
-        role: apiUser.Role as 'user' | 'manager' | 'admin' | 'unit_head',
+        role: normalizeRole(apiUser.Role),
         department: apiUser.Department || department || undefined,
       };
       localStorage.setItem('currentUserId', selectedUser.id);

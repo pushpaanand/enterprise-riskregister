@@ -534,6 +534,18 @@ const App: React.FC = () => {
                                     // eslint-disable-next-line no-console
                                     console.log('User dept options SET:', options);
                                 }
+                            } else if (currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
+                                // Fallback: use assignedDepartments from user record if API returns <2
+                                const options = ['All', ...currentUser.assignedDepartments];
+                                // eslint-disable-next-line no-console
+                                console.log('Using fallback assignedDepartments (API <2):', options);
+                                if (userRole === 'manager') {
+                                    setManagerDeptOptions(options);
+                                    setManagerDept('All');
+                                } else if (userRole === 'user') {
+                                    setUserDeptOptions(options);
+                                    setUserDept('All');
+                                }
                             } else {
                                 // eslint-disable-next-line no-console
                                 console.log('User has only 1 or 0 departments, clearing options');
