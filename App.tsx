@@ -1853,9 +1853,14 @@ const App: React.FC = () => {
                             );
                         }
                         if (currentUser.role === 'user') {
-                            const filtered = risks.filter(r => r.createdByUserId === currentUser.id || (currentUser.department && String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase()));
+                            let filtered = risks.filter(r => r.createdByUserId === currentUser.id || (currentUser.department && String(r.department || '').toLowerCase() === String(currentUser.department).toLowerCase()));
+                            // Apply selected dept when multi-dept available
+                            if (userDept && userDept !== 'All' && userDeptOptions.length >= 2) {
+                                const deptFilter = userDept.toLowerCase();
+                                filtered = filtered.filter(r => String(r.department || '').toLowerCase() === deptFilter);
+                            }
                             const filteredIncidents = incidents.filter(i => filtered.some(fr => fr.id === i.riskId));
-                            const deptOptions = ['All', ...Array.from(new Set(filtered.map(r => (r.department || '').toString()).filter(Boolean)))];
+                            const deptOptions = userDeptOptions.length ? userDeptOptions : ['All', ...Array.from(new Set(filtered.map(r => (r.department || '').toString()).filter(Boolean)))];
                             if (userView === 'reports') {
                                 return (
                                     <ReportsDashboard
@@ -1967,6 +1972,10 @@ const App: React.FC = () => {
                                             setAiIncidentsLoading(false);
                                         }
                                     }}
+                                    // Dept filters
+                                    userDeptOptions={userDeptOptions}
+                                    userDept={userDept}
+                                    onChangeUserDept={setUserDept}
                                 />
                             );
                         }
