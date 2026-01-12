@@ -40,19 +40,7 @@ export async function GET(req: Request) {
           MAX(CASE WHEN h.ApprovalStatus = 'Pending' THEN h.ChangedAtUtc END) AS LatestPendingChange,
           MAX(CASE WHEN h.ApprovalStatus = 'Approved' THEN h.ChangedAtUtc END) AS LatestApprovedChange,
           MAX(CASE WHEN h.ApprovalStatus = 'Rejected' THEN h.ChangedAtUtc END) AS LatestRejectedChange,
-          STUFF((
-            SELECT ', ' + h2.FieldName
-            FROM (
-              SELECT DISTINCT h2.FieldName
-              FROM dbo.RiskHistory h2
-              WHERE h2.RiskId = h.RiskId
-                AND h2.ApprovalStatus = h.ApprovalStatus
-                AND h2.ChangedByUserId = @UserId
-                AND h2.FieldName IS NOT NULL
-            ) AS distinctFields
-            ORDER BY distinctFields.FieldName
-            FOR XML PATH(''), TYPE
-          ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS ChangedFields
+          NULL AS ChangedFields
         FROM dbo.RiskHistory h
         WHERE h.ChangedByUserId = @UserId
           AND h.ApprovalStatus IN ('Pending', 'Approved', 'Rejected')
@@ -94,44 +82,44 @@ export async function GET(req: Request) {
         }
       }
 
-      // Collect changed fields
-      if (row.ChangedFields) {
-        const fields = row.ChangedFields.split(', ');
-        statusMap[riskId].changedFields = [
-          ...new Set([...statusMap[riskId].changedFields, ...fields])
-        ];
-      }
+      // Changed fields will be collected from detailed query below
     });
 
     // Convert to array and get detailed info for pending/rejected
     const results = await Promise.all(
       Object.values(statusMap).map(async (item: any) => {
-        if (item.status === 'Pending' || item.status === 'Rejected') {
-          // Get detailed changes
-          const detailRs = await pool.request()
-            .input('RiskId', sql.UniqueIdentifier, item.riskId)
-            .input('UserId', sql.UniqueIdentifier, userId)
-            .input('Status', sql.NVarChar, item.status)
-            .query(`
-              SELECT 
-                FieldName,
-                OldValue,
-                NewValue,
-                ChangedAtUtc,
-                RejectionReason
-              FROM dbo.RiskHistory
-              WHERE RiskId = @RiskId 
-                AND ChangedByUserId = @UserId
-                AND ApprovalStatus = @Status
-              ORDER BY ChangedAtUtc DESC
-            `);
+        // Get detailed changes for all statuses to collect changed fields
+        const detailRs = await pool.request()
+          .input('RiskId', sql.UniqueIdentifier, item.riskId)
+          .input('UserId', sql.UniqueIdentifier, userId)
+          .input('Status', sql.NVarChar, item.status)
+          .query(`
+            SELECT 
+              FieldName,
+              OldValue,
+              NewValue,
+              ChangedAtUtc,
+              RejectionReason
+            FROM dbo.RiskHistory
+            WHERE RiskId = @RiskId 
+              AND ChangedByUserId = @UserId
+              AND ApprovalStatus = @Status
+            ORDER BY ChangedAtUtc DESC
+          `);
 
-          return {
-            ...item,
-            changes: detailRs.recordset,
-          };
-        }
-        return item;
+        // Collect unique field names
+        const fieldNames = new Set<string>();
+        detailRs.recordset.forEach((row: any) => {
+          if (row.FieldName) {
+            fieldNames.add(row.FieldName);
+          }
+        });
+
+        return {
+          ...item,
+          changes: detailRs.recordset,
+          changedFields: Array.from(fieldNames),
+        };
       })
     );
 

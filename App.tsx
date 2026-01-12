@@ -471,29 +471,8 @@ const App: React.FC = () => {
                 .filter((u: User) => Boolean(u.id && u.name));
             setUsers(mapped);
             
-            // Set department options for current user if they have multiple departments
-            const currentUserData = mapped.find(u => u.id === currentUserId);
-            if (currentUserData) {
-                // eslint-disable-next-line no-console
-                console.log('syncUsersFromApi - currentUserData:', currentUserData.role, 'assignedDepartments:', currentUserData.assignedDepartments);
-                if (currentUserData.role === 'manager' && currentUserData.assignedDepartments && currentUserData.assignedDepartments.length > 1) {
-                    const options = ['All', ...currentUserData.assignedDepartments];
-                    setManagerDeptOptions(options);
-                    // eslint-disable-next-line no-console
-                    console.log('syncUsersFromApi - Manager dept options set:', options);
-                    if (!managerDept || managerDept === 'All') {
-                        setManagerDept('All');
-                    }
-                } else if (currentUserData.role === 'user' && currentUserData.assignedDepartments && currentUserData.assignedDepartments.length > 1) {
-                    const options = ['All', ...currentUserData.assignedDepartments];
-                    setUserDeptOptions(options);
-                    // eslint-disable-next-line no-console
-                    console.log('syncUsersFromApi - User dept options set:', options);
-                    if (!userDept || userDept === 'All') {
-                        setUserDept('All');
-                    }
-                }
-            }
+            // Don't set department options here - let the useEffect handle it
+            // This prevents clearing options that were set by the useEffect
             const targetId = focusUserId || currentUserId;
             if (targetId) {
                 const updatedCurrent = mapped.find(u => u.id === targetId);
@@ -530,28 +509,30 @@ const App: React.FC = () => {
                     if (res.ok) {
                         const data = await res.json();
                         if (Array.isArray(data)) {
-                            const deptNames = data.map((d: any) => d.Department).filter(Boolean);
+                            const deptNames = data.map((d: any) => d.Department || d.department || d.Name || d.name).filter(Boolean);
                             // eslint-disable-next-line no-console
-                            console.log('Fetched departments for user:', currentUser.role, 'departments:', deptNames, 'length:', deptNames.length);
+                            console.log('Fetched departments for user:', currentUser.role, 'departments:', deptNames, 'length:', deptNames.length, 'raw data:', data);
                             
-                            if (deptNames.length > 1) {
+                            // Capture role to avoid closure issues
+                            const userRole = currentUser.role;
+                            
+                            // Force set options if we have 2+ departments
+                            if (deptNames.length >= 2) {
                                 const options = ['All', ...deptNames];
                                 // eslint-disable-next-line no-console
-                                console.log('Setting department options:', currentUser.role, 'options:', options, 'options.length:', options.length);
-                                if (currentUser.role === 'manager') {
+                                console.log('Setting department options:', userRole, 'options:', options, 'options.length:', options.length);
+                                
+                                // Set state immediately
+                                if (userRole === 'manager') {
                                     setManagerDeptOptions(options);
+                                    setManagerDept('All');
                                     // eslint-disable-next-line no-console
-                                    console.log('Manager dept options set to:', options);
-                                    if (!managerDept || managerDept === 'All') {
-                                        setManagerDept('All');
-                                    }
-                                } else if (currentUser.role === 'user') {
+                                    console.log('Manager dept options SET:', options);
+                                } else if (userRole === 'user') {
                                     setUserDeptOptions(options);
+                                    setUserDept('All');
                                     // eslint-disable-next-line no-console
-                                    console.log('User dept options set to:', options);
-                                    if (!userDept || userDept === 'All') {
-                                        setUserDept('All');
-                                    }
+                                    console.log('User dept options SET:', options);
                                 }
                             } else {
                                 // eslint-disable-next-line no-console
@@ -565,6 +546,9 @@ const App: React.FC = () => {
                                     setUserDept('All');
                                 }
                             }
+                        } else {
+                            // eslint-disable-next-line no-console
+                            console.error('API returned non-array data:', data);
                         }
                     } else {
                         // eslint-disable-next-line no-console
@@ -592,6 +576,14 @@ const App: React.FC = () => {
             setUserDeptOptions([]);
         }
     }, [currentUser]);
+
+    // Debug: Track when department options change
+    useEffect(() => {
+        // eslint-disable-next-line no-console
+        console.log('App.tsx - userDeptOptions changed:', userDeptOptions, 'length:', userDeptOptions.length);
+        // eslint-disable-next-line no-console
+        console.log('App.tsx - managerDeptOptions changed:', managerDeptOptions, 'length:', managerDeptOptions.length);
+    }, [userDeptOptions, managerDeptOptions]);
 
     useEffect(() => {
         if (!pendingLinkAction) return;
