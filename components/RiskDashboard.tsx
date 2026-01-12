@@ -389,30 +389,29 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       <div ref={tableSectionRef}>
       {activeTab === 'risks' ? (
         <div className="mt-8">
-          {/* Department Dropdown for Managers/Users with multiple departments */}
-          {((currentUser?.role === 'manager' && effectiveManagerDepts.length >= 2) || 
-            (currentUser?.role === 'user' && effectiveUserDepts.length >= 2)) ? (
-            <div className="mb-4 flex items-center gap-2">
-              <label className="text-sm font-medium text-base-content dark:text-dark-content">Department:</label>
-              <select
-                value={currentUser?.role === 'manager' ? managerDept : userDept}
-                onChange={(e) => {
-                  if (currentUser?.role === 'manager' && onChangeManagerDept) {
-                    onChangeManagerDept(e.target.value);
-                  } else if (currentUser?.role === 'user' && onChangeUserDept) {
-                    onChangeUserDept(e.target.value);
-                  }
-                }}
-                className={filterInputStyles}
-              >
-                {(currentUser?.role === 'manager' ? effectiveManagerDepts : effectiveUserDepts).map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-          {/* Filters */}
+          {/* Filters (keep on one line when space allows) */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
+            {((currentUser?.role === 'manager' && effectiveManagerDepts.length >= 2) || 
+              (currentUser?.role === 'user' && effectiveUserDepts.length >= 2)) && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-base-content dark:text-dark-content">Department</label>
+                <select
+                  value={currentUser?.role === 'manager' ? managerDept : userDept}
+                  onChange={(e) => {
+                    if (currentUser?.role === 'manager' && onChangeManagerDept) {
+                      onChangeManagerDept(e.target.value);
+                    } else if (currentUser?.role === 'user' && onChangeUserDept) {
+                      onChangeUserDept(e.target.value);
+                    }
+                  }}
+                  className={filterInputStyles}
+                >
+                  {(currentUser?.role === 'manager' ? effectiveManagerDepts : effectiveUserDepts).map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <label className="text-sm text-base-content dark:text-dark-content">Status</label>
               <select
