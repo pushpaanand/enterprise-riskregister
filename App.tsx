@@ -532,22 +532,30 @@ const App: React.FC = () => {
                         if (Array.isArray(data)) {
                             const deptNames = data.map((d: any) => d.Department).filter(Boolean);
                             // eslint-disable-next-line no-console
-                            console.log('Fetched departments for user:', currentUser.role, 'departments:', deptNames);
+                            console.log('Fetched departments for user:', currentUser.role, 'departments:', deptNames, 'length:', deptNames.length);
                             
                             if (deptNames.length > 1) {
                                 const options = ['All', ...deptNames];
+                                // eslint-disable-next-line no-console
+                                console.log('Setting department options:', currentUser.role, 'options:', options, 'options.length:', options.length);
                                 if (currentUser.role === 'manager') {
                                     setManagerDeptOptions(options);
+                                    // eslint-disable-next-line no-console
+                                    console.log('Manager dept options set to:', options);
                                     if (!managerDept || managerDept === 'All') {
                                         setManagerDept('All');
                                     }
                                 } else if (currentUser.role === 'user') {
                                     setUserDeptOptions(options);
+                                    // eslint-disable-next-line no-console
+                                    console.log('User dept options set to:', options);
                                     if (!userDept || userDept === 'All') {
                                         setUserDept('All');
                                     }
                                 }
                             } else {
+                                // eslint-disable-next-line no-console
+                                console.log('User has only 1 or 0 departments, clearing options');
                                 // Clear options if user doesn't have multiple departments
                                 if (currentUser.role === 'manager') {
                                     setManagerDeptOptions([]);
@@ -558,6 +566,9 @@ const App: React.FC = () => {
                                 }
                             }
                         }
+                    } else {
+                        // eslint-disable-next-line no-console
+                        console.error('Failed to fetch user departments, status:', res.status);
                     }
                 } catch (e) {
                     // eslint-disable-next-line no-console
@@ -565,6 +576,8 @@ const App: React.FC = () => {
                     // Fallback to assignedDepartments from currentUser
                     if (currentUser.assignedDepartments && currentUser.assignedDepartments.length > 1) {
                         const options = ['All', ...currentUser.assignedDepartments];
+                        // eslint-disable-next-line no-console
+                        console.log('Using fallback assignedDepartments:', options);
                         if (currentUser.role === 'manager') {
                             setManagerDeptOptions(options);
                         } else if (currentUser.role === 'user') {

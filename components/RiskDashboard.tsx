@@ -52,9 +52,17 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
     // eslint-disable-next-line no-console
     console.log('RiskDashboard - currentUser role:', currentUser?.role, 'managerDeptOptions:', managerDeptOptions, 'length:', managerDeptOptions.length, 'userDeptOptions:', userDeptOptions, 'length:', userDeptOptions.length);
     // eslint-disable-next-line no-console
-    console.log('RiskDashboard - Should show manager dropdown:', currentUser?.role === 'manager' && managerDeptOptions.length > 1);
+    console.log('RiskDashboard - Should show manager dropdown:', currentUser?.role === 'manager' && managerDeptOptions.length > 1, 'condition breakdown:', {
+      isManager: currentUser?.role === 'manager',
+      optionsLength: managerDeptOptions.length,
+      lengthCheck: managerDeptOptions.length > 1
+    });
     // eslint-disable-next-line no-console
-    console.log('RiskDashboard - Should show user dropdown:', currentUser?.role === 'user' && userDeptOptions.length > 1);
+    console.log('RiskDashboard - Should show user dropdown:', currentUser?.role === 'user' && userDeptOptions.length > 1, 'condition breakdown:', {
+      isUser: currentUser?.role === 'user',
+      optionsLength: userDeptOptions.length,
+      lengthCheck: userDeptOptions.length > 1
+    });
   }, [currentUser, managerDeptOptions, userDeptOptions]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
