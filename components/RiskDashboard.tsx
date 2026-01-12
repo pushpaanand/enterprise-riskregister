@@ -50,7 +50,11 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   // Debug logging
   React.useEffect(() => {
     // eslint-disable-next-line no-console
-    console.log('RiskDashboard - currentUser role:', currentUser?.role, 'managerDeptOptions:', managerDeptOptions, 'userDeptOptions:', userDeptOptions);
+    console.log('RiskDashboard - currentUser role:', currentUser?.role, 'managerDeptOptions:', managerDeptOptions, 'length:', managerDeptOptions.length, 'userDeptOptions:', userDeptOptions, 'length:', userDeptOptions.length);
+    // eslint-disable-next-line no-console
+    console.log('RiskDashboard - Should show manager dropdown:', currentUser?.role === 'manager' && managerDeptOptions.length > 1);
+    // eslint-disable-next-line no-console
+    console.log('RiskDashboard - Should show user dropdown:', currentUser?.role === 'user' && userDeptOptions.length > 1);
   }, [currentUser, managerDeptOptions, userDeptOptions]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -289,7 +293,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </label>
             </div>
           )}
-          {currentUser?.role === 'manager' && managerDeptOptions.length > 0 && (
+          {currentUser?.role === 'manager' && managerDeptOptions.length > 1 && (
             <div className="mt-8 flex items-center gap-3">
               <label className="text-sm text-base-content dark:text-dark-content">
                 Department
@@ -305,7 +309,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </label>
             </div>
           )}
-          {currentUser?.role === 'user' && userDeptOptions.length > 0 && (
+          {currentUser?.role === 'user' && userDeptOptions.length > 1 && (
             <div className="mt-8 flex items-center gap-3">
               <label className="text-sm text-base-content dark:text-dark-content">
                 Department
