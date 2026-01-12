@@ -51,7 +51,10 @@ export async function GET(req: Request) {
     const statusMap: Record<string, any> = {};
     
     rs.recordset.forEach((row: any) => {
-      const riskId = row.RiskId;
+      // Convert GUID to string
+      const riskId = row.RiskId ? String(row.RiskId) : null;
+      if (!riskId) return;
+      
       if (!statusMap[riskId]) {
         statusMap[riskId] = {
           riskId: riskId,
@@ -65,30 +68,34 @@ export async function GET(req: Request) {
       // Determine the most relevant status (Pending > Rejected > Approved)
       const currentStatus = statusMap[riskId].status;
       const rowStatus = row.ApprovalStatus;
+      const rowLatestChange = row.LatestPendingChange || row.LatestRejectedChange || row.LatestApprovedChange;
       
-      if (!currentStatus || 
-          (rowStatus === 'Pending') ||
-          (rowStatus === 'Rejected' && currentStatus !== 'Pending') ||
-          (rowStatus === 'Approved' && currentStatus === 'Approved' && row.LatestApprovedChange > statusMap[riskId].latestChange)) {
+      // Priority: Pending > Rejected > Approved
+      // If no current status, use this row's status
+      if (!currentStatus) {
         statusMap[riskId].status = rowStatus;
         statusMap[riskId].count = row.EditCount;
-        
-        if (rowStatus === 'Pending' && row.LatestPendingChange) {
-          statusMap[riskId].latestChange = row.LatestPendingChange;
-        } else if (rowStatus === 'Rejected' && row.LatestRejectedChange) {
-          statusMap[riskId].latestChange = row.LatestRejectedChange;
-        } else if (rowStatus === 'Approved' && row.LatestApprovedChange) {
-          statusMap[riskId].latestChange = row.LatestApprovedChange;
-        }
+        statusMap[riskId].latestChange = rowLatestChange;
+      } else if (rowStatus === 'Pending') {
+        // Pending always takes priority over any existing status
+        statusMap[riskId].status = 'Pending';
+        statusMap[riskId].count = row.EditCount;
+        statusMap[riskId].latestChange = row.LatestPendingChange || rowLatestChange;
+      } else if (rowStatus === 'Rejected' && currentStatus !== 'Pending') {
+        // Rejected takes priority over Approved, but not over Pending
+        statusMap[riskId].status = 'Rejected';
+        statusMap[riskId].count = row.EditCount;
+        statusMap[riskId].latestChange = row.LatestRejectedChange || rowLatestChange;
       }
-
-      // Changed fields will be collected from detailed query below
+      // If rowStatus is 'Approved' and we already have Pending or Rejected, don't override
     });
 
-    // Convert to array and get detailed info for pending/rejected
+    // Convert to array and get detailed info for all statuses
     const results = await Promise.all(
       Object.values(statusMap).map(async (item: any) => {
-        // Get detailed changes for all statuses to collect changed fields
+        if (!item.status) return null;
+        
+        // Get detailed changes for the status to collect changed fields
         const detailRs = await pool.request()
           .input('RiskId', sql.UniqueIdentifier, item.riskId)
           .input('UserId', sql.UniqueIdentifier, userId)
@@ -117,13 +124,16 @@ export async function GET(req: Request) {
 
         return {
           ...item,
-          changes: detailRs.recordset,
+          changes: detailRs.recordset || [],
           changedFields: Array.from(fieldNames),
         };
       })
     );
 
-    return withCORS(NextResponse.json(results));
+    // Filter out null entries
+    const filteredResults = results.filter((item: any) => item !== null);
+
+    return withCORS(NextResponse.json(filteredResults));
   } catch (e: any) {
     return withCORS(NextResponse.json({ error: String(e?.message || e) }, { status: 500 }));
   }
