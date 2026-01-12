@@ -52,16 +52,16 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
     // eslint-disable-next-line no-console
     console.log('RiskDashboard - currentUser role:', currentUser?.role, 'managerDeptOptions:', managerDeptOptions, 'length:', managerDeptOptions.length, 'userDeptOptions:', userDeptOptions, 'length:', userDeptOptions.length);
     // eslint-disable-next-line no-console
-    console.log('RiskDashboard - Should show manager dropdown:', currentUser?.role === 'manager' && managerDeptOptions.length > 1, 'condition breakdown:', {
+    console.log('RiskDashboard - Should show manager dropdown:', currentUser?.role === 'manager' && managerDeptOptions.length >= 2, 'condition breakdown:', {
       isManager: currentUser?.role === 'manager',
       optionsLength: managerDeptOptions.length,
-      lengthCheck: managerDeptOptions.length > 1
+      lengthCheck: managerDeptOptions.length >= 2
     });
     // eslint-disable-next-line no-console
-    console.log('RiskDashboard - Should show user dropdown:', currentUser?.role === 'user' && userDeptOptions.length > 1, 'condition breakdown:', {
+    console.log('RiskDashboard - Should show user dropdown:', currentUser?.role === 'user' && userDeptOptions.length >= 2, 'condition breakdown:', {
       isUser: currentUser?.role === 'user',
       optionsLength: userDeptOptions.length,
-      lengthCheck: userDeptOptions.length > 1
+      lengthCheck: userDeptOptions.length >= 2
     });
   }, [currentUser, managerDeptOptions, userDeptOptions]);
 
@@ -301,7 +301,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </label>
             </div>
           )}
-          {currentUser?.role === 'manager' && managerDeptOptions.length > 1 && (
+          {currentUser?.role === 'manager' && managerDeptOptions.length >= 2 && (
             <div className="mt-8 flex items-center gap-3">
               <label className="text-sm text-base-content dark:text-dark-content">
                 Department
@@ -317,7 +317,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </label>
             </div>
           )}
-          {currentUser?.role === 'user' && userDeptOptions.length > 1 && (
+          {currentUser?.role === 'user' && userDeptOptions.length >= 2 && (
             <div className="mt-8 flex items-center gap-3">
               <label className="text-sm text-base-content dark:text-dark-content">
                 Department
@@ -383,8 +383,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
       {activeTab === 'risks' ? (
         <div className="mt-8">
           {/* Department Dropdown for Managers/Users with multiple departments */}
-          {((currentUser?.role === 'manager' && managerDeptOptions.length > 1) || 
-            (currentUser?.role === 'user' && userDeptOptions.length > 1)) ? (
+          {((currentUser?.role === 'manager' && managerDeptOptions.length >= 2) || 
+            (currentUser?.role === 'user' && userDeptOptions.length >= 2)) ? (
             <div className="mb-4 flex items-center gap-2">
               <label className="text-sm font-medium text-base-content dark:text-dark-content">Department:</label>
               <select
