@@ -366,12 +366,17 @@ const UserAdminPage: React.FC<UserAdminPageProps> = ({ users, onAddUser, onRemov
                     {user.employeeId && <span className="block text-xs text-base-content-muted dark:text-dark-content-muted">Emp ID: {user.employeeId}</span>}
                     <span className="block text-xs uppercase font-semibold text-base-content-muted dark:text-dark-content-muted">
                       {user.role}
-                      {(user as any).assignedDepartments 
-                        ? ` • ${(user as any).assignedDepartments}` 
-                        : user.department 
-                        ? ` • ${user.department}` 
-                        : ''}
                     </span>
+                    <span className="block text-xs text-base-content-muted dark:text-dark-content-muted">
+                      Departments: {(user as any).assignedDepartments?.length
+                        ? (user as any).assignedDepartments.join(', ')
+                        : (user.department || '—')}
+                    </span>
+                    {user.unit && (
+                      <span className="block text-xs text-base-content-muted dark:text-dark-content-muted">
+                        Unit: {user.unit}
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3">
                     <button onClick={() => startEdit(user)} className="text-brand-primary hover:opacity-80 transition-colors" aria-label={`Edit ${user.name}`}>Edit</button>
