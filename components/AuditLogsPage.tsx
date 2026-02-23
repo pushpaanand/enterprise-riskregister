@@ -66,6 +66,7 @@ const AuditLogsPage: React.FC = () => {
   const [operationFilter, setOperationFilter] = useState<string>('');
   const [startDateFilter, setStartDateFilter] = useState<string>('');
   const [endDateFilter, setEndDateFilter] = useState<string>('');
+  const [monthFilter, setMonthFilter] = useState<string>(''); // yyyy-MM
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -138,7 +139,19 @@ const AuditLogsPage: React.FC = () => {
     setOperationFilter('');
     setStartDateFilter('');
     setEndDateFilter('');
+    setMonthFilter('');
     setOffset(0);
+  };
+
+  const buildMonthRange = (yyyyMm: string) => {
+    if (!yyyyMm || !/^\d{4}-\d{2}$/.test(yyyyMm)) return { start: '', end: '' };
+    const [y, m] = yyyyMm.split('-').map(Number);
+    const start = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
+    const end = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
+    return {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    };
   };
 
   const handleExportPDF = async () => {
@@ -147,8 +160,12 @@ const AuditLogsPage: React.FC = () => {
       const params = new URLSearchParams();
       if (tableNameFilter) params.append('tableName', tableNameFilter);
       if (operationFilter) params.append('operation', operationFilter);
-      if (startDateFilter) params.append('startDate', startDateFilter);
-      if (endDateFilter) params.append('endDate', endDateFilter);
+      // Month filter overrides explicit start/end if present
+      const { start, end } = buildMonthRange(monthFilter);
+      if (start) params.append('startDate', start);
+      if (end) params.append('endDate', end);
+      if (!start && startDateFilter) params.append('startDate', startDateFilter);
+      if (!end && endDateFilter) params.append('endDate', endDateFilter);
       params.append('limit', '10000'); // Get all logs
       params.append('offset', '0');
 
@@ -208,11 +225,94 @@ const AuditLogsPage: React.FC = () => {
     }
   };
 
+  const handleDownloadCSV = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (tableNameFilter) params.append('tableName', tableNameFilter);
+      if (operationFilter) params.append('operation', operationFilter);
+      const { start, end } = buildMonthRange(monthFilter);
+      if (start) params.append('startDate', start);
+      if (end) params.append('endDate', end);
+      if (!start && startDateFilter) params.append('startDate', startDateFilter);
+      if (!end && endDateFilter) params.append('endDate', endDateFilter);
+      params.append('limit', '10000');
+      params.append('offset', '0');
+
+      const response = await fetch(apiUrl('/audit-logs') + `?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch audit logs for CSV');
+      }
+      const data = await response.json();
+      const rows: AuditLog[] = data.logs || [];
+
+      const header = [
+        'Timestamp',
+        'Table',
+        'Operation',
+        'Field',
+        'OldValue',
+        'NewValue',
+        'ChangedById',
+        'ChangedByName',
+        'IPAddress',
+        'UserAgent',
+        'RecordId'
+      ];
+
+      const toCsvValue = (v: any) => {
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+        return s;
+      };
+
+      const lines = [
+        header.join(','),
+        ...rows.map((log) =>
+          [
+            formatDate(log.ChangedAtUtc),
+            log.TableName || '',
+            log.Operation || '',
+            log.FieldName || '',
+            log.OldValue || '',
+            log.NewValue || '',
+            log.ChangedByUserId || '',
+            log.ChangedByUserName || '',
+            log.IPAddress || '',
+            log.UserAgent || '',
+            log.RecordId || ''
+          ]
+            .map(toCsvValue)
+            .join(',')
+        )
+      ];
+
+      const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const label = monthFilter ? monthFilter : 'all';
+      a.download = `audit_logs_${label}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Failed to download CSV: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-2xl font-bold text-base-content dark:text-dark-content">Audit Logs</h2>
         <div className="flex gap-2">
+          <button
+            onClick={handleDownloadCSV}
+            className="px-4 py-2 text-sm font-medium text-base-content dark:text-dark-content bg-base-200 dark:bg-dark-200 hover:bg-base-300 dark:hover:bg-dark-300 rounded-md transition-colors"
+          >
+            Download CSV
+          </button>
           <button
             onClick={handleExportPDF}
             className="px-4 py-2 text-sm font-medium text-base-content dark:text-dark-content bg-brand-primary hover:bg-brand-primary/90 text-white rounded-md transition-colors"
@@ -229,7 +329,7 @@ const AuditLogsPage: React.FC = () => {
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-base-100 dark:bg-dark-100 rounded-lg border border-base-300 dark:border-dark-300">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 p-4 bg-base-100 dark:bg-dark-100 rounded-lg border border-base-300 dark:border-dark-300">
         <div>
           <label className="block text-sm font-medium text-base-content dark:text-dark-content mb-1">
             Table Name
@@ -294,6 +394,20 @@ const AuditLogsPage: React.FC = () => {
             }}
             className="w-full px-3 py-2 border border-base-300 dark:border-dark-300 rounded-md bg-base-50 dark:bg-dark-50 text-base-content dark:text-dark-content"
           />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-base-content dark:text-dark-content mb-1">
+            Month (for export/download)
+          </label>
+          <input
+            type="month"
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="w-full px-3 py-2 border border-base-300 dark:border-dark-300 rounded-md bg-base-50 dark:bg-dark-50 text-base-content dark:text-dark-content"
+          />
+          <p className="mt-1 text-xs text-base-content-muted dark:text-dark-content-muted">
+            Month overrides custom dates for export/download.
+          </p>
         </div>
       </div>
 
