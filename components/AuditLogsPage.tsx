@@ -41,7 +41,7 @@ interface AuditLog {
   AuditLogId: string;
   TableName: string;
   RecordId: string;
-  Operation: 'INSERT' | 'UPDATE' | 'DELETE';
+  Operation: 'INSERT' | 'UPDATE' | 'DELETE' | 'READ';
   FieldName: string | null;
   OldValue: string | null;
   NewValue: string | null;
@@ -365,6 +365,7 @@ const AuditLogsPage: React.FC = () => {
             <option value="INSERT">INSERT</option>
             <option value="UPDATE">UPDATE</option>
             <option value="DELETE">DELETE</option>
+            <option value="READ">READ</option>
           </select>
         </div>
         <div>
