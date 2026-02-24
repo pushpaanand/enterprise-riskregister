@@ -198,6 +198,7 @@ const App: React.FC = () => {
                     const queryParams = new URLSearchParams();
                     if (userId) queryParams.set('userId', userId);
                     if (userRole) queryParams.set('role', userRole);
+                    if (currentUser?.name) queryParams.set('userName', currentUser.name);
                     const queryString = queryParams.toString();
                     const apiPath = `/risks${queryString ? `?${queryString}` : ''}`;
                     const res = await fetch(apiUrl(apiPath));
@@ -440,7 +441,10 @@ const App: React.FC = () => {
 
     const syncUsersFromApi = useCallback(async (focusUserId?: string) => {
         try {
-            const res = await fetch(apiUrl('/users'));
+                    const userParams = new URLSearchParams();
+                    if (currentUserId) userParams.set('requestedBy', currentUserId);
+                    if (currentUser?.name) userParams.set('requestedByName', currentUser.name);
+                    const res = await fetch(apiUrl(`/users${userParams.toString() ? `?${userParams.toString()}` : ''}`));
             if (!res.ok) {
                 const detail = await res.text().catch(() => '');
                 // eslint-disable-next-line no-console
