@@ -109,6 +109,9 @@ const App: React.FC = () => {
     const [aiIncidentsLoading, setAiIncidentsLoading] = useState<boolean>(false);
     // Edit status for user's risk edits
     const [editStatuses, setEditStatuses] = useState<Record<string, any>>({});
+    // Pending edit approvals (for managers/admins to see under Pending Action)
+    const [pendingEdits, setPendingEdits] = useState<any[]>([]);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
     const hasAppliedStatusAging = useRef<boolean>(false);
     const [summaryRiskId, setSummaryRiskId] = useState<string | null>(null);
     const [pendingLinkAction, setPendingLinkAction] = useState<LinkAction | null>(() => parseLinkActionFromLocation());
@@ -344,8 +347,37 @@ const App: React.FC = () => {
             } else {
                 setEditStatuses({});
             }
+
+            // Load pending edit approvals for managers and admins (shown in Pending Action tab)
+            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
+                (async () => {
+                    try {
+                        const params = new URLSearchParams();
+                        if (currentUser.role === 'manager' && currentUser.id) {
+                            params.set('userId', currentUser.id);
+                        }
+                        if (currentUser.role === 'admin' && adminDept && adminDept !== 'All') {
+                            // departmentId filter would need department GUID; optional
+                        }
+                        const url = apiUrl(`/risks/pending-edits${params.toString() ? `?${params.toString()}` : ''}`);
+                        const res = await fetch(url);
+                        if (res.ok) {
+                            const data = await res.json();
+                            setPendingEdits(Array.isArray(data) ? data : []);
+                        } else {
+                            setPendingEdits([]);
+                        }
+                    } catch (e) {
+                        // eslint-disable-next-line no-console
+                        console.error('Failed to load pending edits', e);
+                        setPendingEdits([]);
+                    }
+                })();
+            } else {
+                setPendingEdits([]);
+            }
         }
-    }, [currentUser, adminDept, adminStatus, adminDeptOptions, userDept, userDeptOptions, managerDept, managerDeptOptions]);
+    }, [currentUser, adminDept, adminStatus, adminDeptOptions, userDept, userDeptOptions, managerDept, managerDeptOptions, refreshTrigger]);
 
     // Recompute admin risk filter when adminDept changes or allRisks update
     useEffect(() => {
@@ -426,6 +458,46 @@ const App: React.FC = () => {
     }, []);
 
     // User switching removed - users can only see their own account
+
+    const handleRefreshPendingEdits = useCallback(() => {
+        setRefreshTrigger(r => r + 1);
+    }, []);
+
+    const handleApproveEdit = useCallback(async (riskId: string, historyId: number) => {
+        if (!currentUser?.id) return;
+        try {
+            const res = await fetch(apiUrl(`/risks/${riskId}/approve-edit`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ historyId, approvedByUserId: currentUser.id }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error || 'Approve failed');
+            setRefreshTrigger(r => r + 1);
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Approve edit failed', e);
+            throw e;
+        }
+    }, [currentUser?.id]);
+
+    const handleRejectEdit = useCallback(async (riskId: string, rejectionReason?: string) => {
+        if (!currentUser?.id) return;
+        try {
+            const res = await fetch(apiUrl(`/risks/${riskId}/reject-edit`), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ approvedByUserId: currentUser.id, rejectionReason: rejectionReason || null }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data?.error || 'Reject failed');
+            setRefreshTrigger(r => r + 1);
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Reject edit failed', e);
+            throw e;
+        }
+    }, [currentUser?.id]);
 
     const handleLoggedIn = (user: User) => {
         // Sync users from localStorage (in case login created a new user)
@@ -1426,6 +1498,10 @@ const App: React.FC = () => {
                             onSaveRisk={handleSaveRisk}
                             onDeleteRisk={handleDeleteRisk}
                             editStatuses={editStatuses}
+                            pendingEdits={pendingEdits}
+                            onRefreshPendingEdits={handleRefreshPendingEdits}
+                            onApproveEdit={handleApproveEdit}
+                            onRejectEdit={handleRejectEdit}
                             onApproveRisk={(risk) => handleSaveRisk({
                                 id: risk.id,
                                 description: risk.description,
@@ -1604,6 +1680,10 @@ const App: React.FC = () => {
                                     userDept={userDept}
                                     onChangeUserDept={setUserDept}
                                     editStatuses={editStatuses}
+                                    pendingEdits={pendingEdits}
+                                    onRefreshPendingEdits={handleRefreshPendingEdits}
+                                    onApproveEdit={handleApproveEdit}
+                                    onRejectEdit={handleRejectEdit}
                                     onApproveRisk={(risk) => handleSaveRisk({
                                         id: risk.id,
                                         description: risk.description,
@@ -1763,6 +1843,10 @@ const App: React.FC = () => {
                                     onSaveRisk={handleSaveRisk}
                                     onDeleteRisk={handleDeleteRisk}
                                     editStatuses={editStatuses}
+                                    pendingEdits={pendingEdits}
+                                    onRefreshPendingEdits={handleRefreshPendingEdits}
+                                    onApproveEdit={handleApproveEdit}
+                                    onRejectEdit={handleRejectEdit}
                                     incidents={opsIncidents}
                                     incidentHistory={incidentHistory}
                                     onAddIncident={handleAddIncident}
@@ -1884,6 +1968,10 @@ const App: React.FC = () => {
                                     onSaveRisk={handleSaveRisk}
                                     onDeleteRisk={handleDeleteRisk}
                                     editStatuses={editStatuses}
+                                    pendingEdits={pendingEdits}
+                                    onRefreshPendingEdits={handleRefreshPendingEdits}
+                                    onApproveEdit={handleApproveEdit}
+                                    onRejectEdit={handleRejectEdit}
                                     incidents={filteredIncidents}
                                     incidentHistory={incidentHistory}
                                     onAddIncident={handleAddIncident}
@@ -1992,6 +2080,10 @@ const App: React.FC = () => {
                         onSaveRisk={handleSaveRisk}
                         onDeleteRisk={handleDeleteRisk}
                                 editStatuses={editStatuses}
+                                pendingEdits={pendingEdits}
+                                onRefreshPendingEdits={handleRefreshPendingEdits}
+                                onApproveEdit={handleApproveEdit}
+                                onRejectEdit={handleRejectEdit}
                                 onApproveRisk={(risk) => handleSaveRisk({
                                     id: risk.id,
                                     description: risk.description,

@@ -44,9 +44,14 @@ interface RiskDashboardProps {
   onChangeUserDept?: (v: string) => void;
   // Edit status for user's risk edits
   editStatuses?: Record<string, any>;
+  // Pending edit approvals (for manager/admin in Pending Action tab)
+  pendingEdits?: any[];
+  onRefreshPendingEdits?: () => void;
+  onApproveEdit?: (riskId: string, historyId: number) => Promise<void>;
+  onRejectEdit?: (riskId: string, rejectionReason?: string) => Promise<void>;
 }
 
-const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept, editStatuses = {} }) => {
+const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept, editStatuses = {}, pendingEdits = [], onRefreshPendingEdits, onApproveEdit, onRejectEdit }) => {
   // Debug logging
   // Derive effective department options (fallback to assignedDepartments if needed)
   const effectiveManagerDepts = React.useMemo(() => {
@@ -105,6 +110,10 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [rejectedPage, setRejectedPage] = useState<number>(1);
   const [rejectTarget, setRejectTarget] = useState<Risk | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
+  const [rejectEditRiskId, setRejectEditRiskId] = useState<string | null>(null);
+  const [rejectEditRiskNo, setRejectEditRiskNo] = useState<string>('');
+  const [rejectEditReason, setRejectEditReason] = useState<string>('');
+  const [approvingEditRiskId, setApprovingEditRiskId] = useState<string | null>(null);
   
   const openEditModal = (risk: Risk) => {
     setRiskToEdit(risk);
@@ -245,7 +254,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
           <button onClick={() => setActiveTab('pending')} className={`px-3 py-1.5 text-sm rounded-md border relative ${activeTab==='pending'?'bg-brand-primary text-white border-brand-primary':'bg-base-300/50 dark:bg-dark-300 text-base-content dark:text-dark-content border-base-300 dark:border-dark-300'}`}>
             Pending Action
             {(() => {
-              const pendingCount = risks.filter(r => r.status === 'Raised').length;
+              const raisedCount = risks.filter(r => r.status === 'Raised').length;
+              const editCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingEdits?.length || 0) : 0;
+              const pendingCount = raisedCount + editCount;
               if (pendingCount > 0) {
                 return (
                   <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
@@ -616,8 +627,83 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
           </div>
         </div>
       ) : activeTab === 'pending' ? (
-        <div className="mt-8">
-          {/* Filters for pending actions */}
+        <div className="mt-8 space-y-8">
+          {/* Pending edits (manager/admin) - edits submitted by users awaiting approval */}
+          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && pendingEdits && pendingEdits.length > 0 && (
+            <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
+              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">Pending edits</h3>
+              <p className="text-sm text-base-content-muted dark:text-dark-content-muted mb-4">
+                The following risks have edits submitted by users. Approve to apply changes or reject to discard.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
+                  <thead className="bg-brand-secondary">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Risk ID</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Description</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Changed by</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Fields</th>
+                      <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-base-300 dark:divide-dark-300">
+                    {pendingEdits.map((pe: any) => {
+                      const riskIdStr = String(pe.RiskId || pe.riskId || '');
+                      const firstHistoryId = pe.pendingChanges?.[0]?.RiskHistoryId ?? pe.pendingChanges?.[0]?.riskHistoryId;
+                      const isApproving = approvingEditRiskId === riskIdStr;
+                      return (
+                        <tr key={riskIdStr} className="bg-base-100 dark:bg-dark-100">
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content font-medium">{pe.RiskNo || pe.riskNo || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content max-w-[280px] truncate" title={pe.RiskDescription || pe.riskDescription}>{pe.RiskDescription || pe.riskDescription || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{pe.DepartmentName || pe.departmentName || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{pe.ChangedByName || pe.changedByName || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{pe.ChangedFields || pe.changedFields || '-'}</td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={isApproving || !onApproveEdit || !firstHistoryId}
+                                onClick={async () => {
+                                  if (!onApproveEdit || !firstHistoryId) return;
+                                  setApprovingEditRiskId(riskIdStr);
+                                  try {
+                                    await onApproveEdit(riskIdStr, firstHistoryId);
+                                    onRefreshPendingEdits?.();
+                                  } catch (e) {
+                                    // Error already logged in parent
+                                  } finally {
+                                    setApprovingEditRiskId(null);
+                                  }
+                                }}
+                                className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50"
+                              >
+                                {isApproving ? 'Approving…' : 'Approve'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!onRejectEdit}
+                                onClick={() => {
+                                  setRejectEditRiskId(riskIdStr);
+                                  setRejectEditRiskNo(pe.RiskNo || pe.riskNo || '');
+                                  setRejectEditReason('');
+                                }}
+                                className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Filters for pending actions (Raised risks) */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
               <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
@@ -706,7 +792,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                   <button disabled={pendingPage>=totalPages} onClick={() => setPendingPage(p => Math.min(totalPages, p+1))} className="px-2 py-1 rounded border disabled:opacity-50">Next</button>
                 </div>
                 <div className="mt-2 text-xs text-base-content-muted dark:text-dark-content-muted">
-                  Showing risks with Status = Raised. Managers can approve or reject these risks.
+                  Showing risks with Status = Raised (new risks) and, for managers/admins, any pending edits above. Approve or reject as needed.
                 </div>
               </>
             );
@@ -952,6 +1038,52 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-500 disabled:opacity-50"
             >
               Reject Risk
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(rejectEditRiskId)}
+        onClose={() => { setRejectEditRiskId(null); setRejectEditRiskNo(''); setRejectEditReason(''); }}
+        title="Reject edit"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-base-content dark:text-dark-content">
+            Optionally provide a reason for rejecting the edit for risk <strong>{rejectEditRiskNo}</strong>.
+          </p>
+          <div>
+            <label className="block text-sm font-medium text-base-content dark:text-dark-content mb-1">Reason (optional)</label>
+            <textarea
+              value={rejectEditReason}
+              onChange={(e) => setRejectEditReason(e.target.value)}
+              rows={3}
+              className="w-full rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-2 text-sm text-base-content dark:text-dark-content focus:outline-none focus:ring-2 focus:ring-brand-primary"
+              placeholder="Reason for rejecting this edit..."
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => { setRejectEditRiskId(null); setRejectEditRiskNo(''); setRejectEditReason(''); }}
+              className="px-3 py-2 text-sm rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 hover:bg-base-200 dark:hover:bg-dark-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (rejectEditRiskId && onRejectEdit) {
+                  await onRejectEdit(rejectEditRiskId, rejectEditReason.trim() || undefined);
+                  onRefreshPendingEdits?.();
+                }
+                setRejectEditRiskId(null);
+                setRejectEditRiskNo('');
+                setRejectEditReason('');
+              }}
+              className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-500"
+            >
+              Reject edit
             </button>
           </div>
         </div>
