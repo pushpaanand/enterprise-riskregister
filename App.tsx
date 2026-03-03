@@ -1469,7 +1469,7 @@ const App: React.FC = () => {
                                 </div>
                             )}
                             {currentUser?.role === 'manager' && (
-                                <div className="hidden sm:flex items-center gap-3 mr-2">
+                                <div className="flex items-center gap-3 mr-2">
                                     <button
                                         onClick={() => setManagerView('risks')}
                                         className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
@@ -1493,7 +1493,7 @@ const App: React.FC = () => {
                                 </div>
                             )}
                             {currentUser?.role === 'unit_head' && (
-                                <div className="hidden sm:flex items-center gap-3 mr-2">
+                                <div className="flex items-center gap-3 mr-2">
                                     <button
                                         onClick={() => setUnitHeadView('risks')}
                                         className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
@@ -1517,7 +1517,7 @@ const App: React.FC = () => {
                                 </div>
                             )}
                             {currentUser?.role === 'user' && (
-                                <div className="hidden sm:flex items-center gap-3 mr-2">
+                                <div className="flex items-center gap-3 mr-2">
                                     <button
                                         onClick={() => setUserView('risks')}
                                         className={`px-3 py-1.5 text-sm rounded-md border transition-colors ${
