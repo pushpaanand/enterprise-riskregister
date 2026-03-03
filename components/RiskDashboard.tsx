@@ -268,9 +268,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             Pending Action
             {(() => {
               const raisedCount = risks.filter(r => String(r.status || '').toLowerCase() === 'raised').length;
-              const editCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingEdits?.length || 0) : 0;
-              const incidentNewCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingNewIncidents?.length || 0) : 0;
-              const incidentEditCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingIncidentEdits?.length || 0) : 0;
+              const editCount = pendingEdits?.length || 0;
+              const incidentNewCount = pendingNewIncidents?.length || 0;
+              const incidentEditCount = pendingIncidentEdits?.length || 0;
               const pendingCount = raisedCount + editCount + incidentNewCount + incidentEditCount;
               if (pendingCount > 0) {
                 return (
@@ -643,12 +643,16 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
         </div>
       ) : activeTab === 'pending' ? (
         <div className="mt-8 space-y-8">
-          {/* Pending edits (manager/admin) - edits submitted by users awaiting approval */}
-          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && pendingEdits && pendingEdits.length > 0 && (
+          {/* Pending risk edits: manager/admin see with Approve/Reject; user sees their own (read-only) */}
+          {pendingEdits && pendingEdits.length > 0 && (
             <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">Pending edits</h3>
+              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">
+                {(currentUser?.role === 'manager' || currentUser?.role === 'admin') ? 'Pending edits' : 'Your pending risk edits'}
+              </h3>
               <p className="text-sm text-base-content-muted dark:text-dark-content-muted mb-4">
-                The following risks have edits submitted by users. Approve to apply changes or reject to discard.
+                {(currentUser?.role === 'manager' || currentUser?.role === 'admin')
+                  ? 'The following risks have edits submitted by users. Approve to apply changes or reject to discard.'
+                  : 'Your risk edits are awaiting manager approval.'}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
@@ -659,7 +663,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Changed by</th>
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Fields</th>
-                      <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                      {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+                        <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-base-300 dark:divide-dark-300">
@@ -667,6 +673,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       const riskIdStr = String(pe.RiskId || pe.riskId || '');
                       const firstHistoryId = pe.pendingChanges?.[0]?.RiskHistoryId ?? pe.pendingChanges?.[0]?.riskHistoryId;
                       const isApproving = approvingEditRiskId === riskIdStr;
+                      const showActions = currentUser?.role === 'manager' || currentUser?.role === 'admin';
                       return (
                         <tr key={riskIdStr} className="bg-base-100 dark:bg-dark-100">
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content font-medium">{pe.RiskNo || pe.riskNo || '-'}</td>
@@ -674,41 +681,43 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{pe.DepartmentName || pe.departmentName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{pe.ChangedByName || pe.changedByName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{pe.ChangedFields || pe.changedFields || '-'}</td>
-                          <td className="px-3 py-2 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                disabled={isApproving || !onApproveEdit || !firstHistoryId}
-                                onClick={async () => {
-                                  if (!onApproveEdit || !firstHistoryId) return;
-                                  setApprovingEditRiskId(riskIdStr);
-                                  try {
-                                    await onApproveEdit(riskIdStr, firstHistoryId);
-                                    onRefreshPendingEdits?.();
-                                  } catch (e) {
-                                    // Error already logged in parent
-                                  } finally {
-                                    setApprovingEditRiskId(null);
-                                  }
-                                }}
-                                className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50"
-                              >
-                                {isApproving ? 'Approving…' : 'Approve'}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!onRejectEdit}
-                                onClick={() => {
-                                  setRejectEditRiskId(riskIdStr);
-                                  setRejectEditRiskNo(pe.RiskNo || pe.riskNo || '');
-                                  setRejectEditReason('');
-                                }}
-                                className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          </td>
+                          {showActions && (
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  type="button"
+                                  disabled={isApproving || !onApproveEdit || !firstHistoryId}
+                                  onClick={async () => {
+                                    if (!onApproveEdit || !firstHistoryId) return;
+                                    setApprovingEditRiskId(riskIdStr);
+                                    try {
+                                      await onApproveEdit(riskIdStr, firstHistoryId);
+                                      onRefreshPendingEdits?.();
+                                    } catch (e) {
+                                      // Error already logged in parent
+                                    } finally {
+                                      setApprovingEditRiskId(null);
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50"
+                                >
+                                  {isApproving ? 'Approving…' : 'Approve'}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!onRejectEdit}
+                                  onClick={() => {
+                                    setRejectEditRiskId(riskIdStr);
+                                    setRejectEditRiskNo(pe.RiskNo || pe.riskNo || '');
+                                    setRejectEditReason('');
+                                  }}
+                                  className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -718,12 +727,16 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           )}
 
-          {/* Pending new incidents (user-created, awaiting approval) */}
-          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && pendingNewIncidents && pendingNewIncidents.length > 0 && (
+          {/* Pending new incidents: manager/admin see with Approve/Reject; user sees their own (read-only) */}
+          {pendingNewIncidents && pendingNewIncidents.length > 0 && (
             <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">Pending new incidents</h3>
+              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">
+                {(currentUser?.role === 'manager' || currentUser?.role === 'admin') ? 'Pending new incidents' : 'Your pending new incidents'}
+              </h3>
               <p className="text-sm text-base-content-muted dark:text-dark-content-muted mb-4">
-                New incidents submitted by users. Approve or reject.
+                {(currentUser?.role === 'manager' || currentUser?.role === 'admin')
+                  ? 'New incidents submitted by users. Approve or reject.'
+                  : 'Your new incidents are awaiting manager approval.'}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[600px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
@@ -733,25 +746,30 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Summary</th>
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Created by</th>
-                      <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                      {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+                        <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-base-300 dark:divide-dark-300">
                     {pendingNewIncidents.map((inc: any) => {
                       const idStr = String(inc.IncidentId || inc.incidentId || '');
                       const isApproving = approvingIncidentId === idStr;
+                      const showActions = currentUser?.role === 'manager' || currentUser?.role === 'admin';
                       return (
                         <tr key={idStr} className="bg-base-100 dark:bg-dark-100">
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content font-medium">{inc.RiskNo || inc.riskNo || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content max-w-[240px] truncate" title={inc.Summary || inc.summary}>{inc.Summary || inc.summary || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{inc.DepartmentName || inc.departmentName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{inc.CreatedByName || inc.createdByName || '-'}</td>
-                          <td className="px-3 py-2 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button type="button" disabled={isApproving || !onApproveIncident} onClick={async () => { if (!onApproveIncident) return; setApprovingIncidentId(idStr); try { await onApproveIncident(idStr); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
-                              <button type="button" disabled={!onRejectIncident} onClick={() => { setRejectIncidentId(idStr); setRejectIncidentReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
-                            </div>
-                          </td>
+                          {showActions && (
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button type="button" disabled={isApproving || !onApproveIncident} onClick={async () => { if (!onApproveIncident) return; setApprovingIncidentId(idStr); try { await onApproveIncident(idStr); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
+                                <button type="button" disabled={!onRejectIncident} onClick={() => { setRejectIncidentId(idStr); setRejectIncidentReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -761,12 +779,16 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           )}
 
-          {/* Pending incident edits */}
-          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && pendingIncidentEdits && pendingIncidentEdits.length > 0 && (
+          {/* Pending incident edits: manager/admin see with Approve/Reject; user sees their own (read-only) */}
+          {pendingIncidentEdits && pendingIncidentEdits.length > 0 && (
             <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
-              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">Pending incident edits</h3>
+              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">
+                {(currentUser?.role === 'manager' || currentUser?.role === 'admin') ? 'Pending incident edits' : 'Your pending incident edits'}
+              </h3>
               <p className="text-sm text-base-content-muted dark:text-dark-content-muted mb-4">
-                Incident edits submitted by users. Approve to apply or reject to discard.
+                {(currentUser?.role === 'manager' || currentUser?.role === 'admin')
+                  ? 'Incident edits submitted by users. Approve to apply or reject to discard.'
+                  : 'Your incident edits are awaiting manager approval.'}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
@@ -777,7 +799,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Changed by</th>
                       <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Fields</th>
-                      <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                      {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && (
+                        <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-base-300 dark:divide-dark-300">
@@ -785,6 +809,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       const incidentIdStr = String(pe.IncidentId || pe.incidentId || '');
                       const firstHistoryId = pe.pendingChanges?.[0]?.IncidentHistoryId ?? pe.pendingChanges?.[0]?.incidentHistoryId;
                       const isApproving = approvingIncidentEditId === incidentIdStr;
+                      const showActions = currentUser?.role === 'manager' || currentUser?.role === 'admin';
                       return (
                         <tr key={incidentIdStr} className="bg-base-100 dark:bg-dark-100">
                           <td className="px-3 py-2 text-sm font-medium">{pe.RiskNo || pe.riskNo || '-'}</td>
@@ -792,12 +817,14 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                           <td className="px-3 py-2 text-sm">{pe.DepartmentName || pe.departmentName || '-'}</td>
                           <td className="px-3 py-2 text-sm">{pe.ChangedByName || pe.changedByName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{pe.ChangedFields || pe.changedFields || '-'}</td>
-                          <td className="px-3 py-2 text-right">
-                            <div className="flex justify-end gap-2">
-                              <button type="button" disabled={isApproving || !onApproveIncidentEdit || !firstHistoryId} onClick={async () => { if (!onApproveIncidentEdit || !firstHistoryId) return; setApprovingIncidentEditId(incidentIdStr); try { await onApproveIncidentEdit(incidentIdStr, firstHistoryId); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentEditId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
-                              <button type="button" disabled={!onRejectIncidentEdit} onClick={() => { setRejectIncidentEditId(incidentIdStr); setRejectIncidentEditReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
-                            </div>
-                          </td>
+                          {showActions && (
+                            <td className="px-3 py-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button type="button" disabled={isApproving || !onApproveIncidentEdit || !firstHistoryId} onClick={async () => { if (!onApproveIncidentEdit || !firstHistoryId) return; setApprovingIncidentEditId(incidentIdStr); try { await onApproveIncidentEdit(incidentIdStr, firstHistoryId); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentEditId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
+                                <button type="button" disabled={!onRejectIncidentEdit} onClick={() => { setRejectIncidentEditId(incidentIdStr); setRejectIncidentEditReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })}

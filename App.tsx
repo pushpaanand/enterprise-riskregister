@@ -352,57 +352,60 @@ const App: React.FC = () => {
                 setEditStatuses({});
             }
 
-            // Load pending edit approvals for managers and admins (shown in Pending Action tab)
-            // Manager: pass userId so API returns only their department(s)' pending edits
-            // Admin: do not pass userId so API returns ALL pending edits across the org
-            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
-                (async () => {
-                    try {
-                        const params = new URLSearchParams();
-                        if (currentUser.role === 'manager' && currentUser.id) {
-                            params.set('userId', currentUser.id);
-                        }
-                        // Admin: no filter = all pending edits; manager: userId = only their depts
-                        const url = apiUrl(`/risks/pending-edits${params.toString() ? `?${params.toString()}` : ''}`);
-                        const res = await fetch(url);
-                        if (res.ok) {
-                            const data = await res.json();
-                            setPendingEdits(Array.isArray(data) ? data : []);
-                        } else {
-                            setPendingEdits([]);
-                        }
-                    } catch (e) {
-                        // eslint-disable-next-line no-console
-                        console.error('Failed to load pending edits', e);
+            // Load pending edit approvals: managers/admins see their dept/all; users see their own pending edits
+            (async () => {
+                try {
+                    const params = new URLSearchParams();
+                    if (currentUser.role === 'manager' && currentUser.id) {
+                        params.set('userId', currentUser.id);
+                        if (currentUser.department) params.set('departmentName', currentUser.department);
+                    } else if (currentUser.role === 'user' && currentUser.id) {
+                        params.set('changedByUserId', currentUser.id);
+                    }
+                    const url = apiUrl(`/risks/pending-edits${params.toString() ? `?${params.toString()}` : ''}`);
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setPendingEdits(Array.isArray(data) ? data : []);
+                    } else {
                         setPendingEdits([]);
                     }
-                })();
-            } else {
-                setPendingEdits([]);
-            }
+                } catch (e) {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to load pending edits', e);
+                    setPendingEdits([]);
+                }
+            })();
 
-            // Load pending incident (new + edits) approvals for managers and admins
-            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
-                (async () => {
-                    try {
-                        const params = new URLSearchParams();
-                        if (currentUser.role === 'manager' && currentUser.id) params.set('userId', currentUser.id);
-                        const base = params.toString() ? `?${params.toString()}` : '';
-                        const [newRes, editsRes] = await Promise.all([
-                            fetch(apiUrl(`/incidents/pending-new${base}`)),
-                            fetch(apiUrl(`/incidents/pending-edits${base}`)),
-                        ]);
-                        setPendingNewIncidents(newRes.ok ? (await newRes.json()) : []);
-                        setPendingIncidentEdits(editsRes.ok ? (await editsRes.json()) : []);
-                    } catch (e) {
-                        setPendingNewIncidents([]);
-                        setPendingIncidentEdits([]);
+            // Load pending incident (new + edits): managers/admins see dept/all; users see their own
+            (async () => {
+                try {
+                    const newParams = new URLSearchParams();
+                    const editParams = new URLSearchParams();
+                    if (currentUser.role === 'manager' && currentUser.id) {
+                        newParams.set('userId', currentUser.id);
+                        editParams.set('userId', currentUser.id);
+                        if (currentUser.department) {
+                            newParams.set('departmentName', currentUser.department);
+                            editParams.set('departmentName', currentUser.department);
+                        }
+                    } else if (currentUser.role === 'user' && currentUser.id) {
+                        newParams.set('createdByUserId', currentUser.id);
+                        editParams.set('changedByUserId', currentUser.id);
                     }
-                })();
-            } else {
-                setPendingNewIncidents([]);
-                setPendingIncidentEdits([]);
-            }
+                    const newBase = newParams.toString() ? `?${newParams.toString()}` : '';
+                    const editBase = editParams.toString() ? `?${editParams.toString()}` : '';
+                    const [newRes, editsRes] = await Promise.all([
+                        fetch(apiUrl(`/incidents/pending-new${newBase}`)),
+                        fetch(apiUrl(`/incidents/pending-edits${editBase}`)),
+                    ]);
+                    setPendingNewIncidents(newRes.ok ? (await newRes.json()) : []);
+                    setPendingIncidentEdits(editsRes.ok ? (await editsRes.json()) : []);
+                } catch (e) {
+                    setPendingNewIncidents([]);
+                    setPendingIncidentEdits([]);
+                }
+            })();
         }
     }, [currentUser, adminDept, adminStatus, adminDeptOptions, userDept, userDeptOptions, managerDept, managerDeptOptions, refreshTrigger]);
 
