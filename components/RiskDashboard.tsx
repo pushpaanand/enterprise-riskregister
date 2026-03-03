@@ -10,6 +10,7 @@ import IncidentForm from './IncidentForm';
 import IncidentHistoryModal from './IncidentHistoryModal';
 import Modal from './ui/Modal';
 import RiskChangeHistoryModal from './RiskChangeHistoryModal';
+import PendingActionDetailModal, { PendingDetailType } from './PendingActionDetailModal';
 
 interface RiskDashboardProps {
   risks: Risk[];
@@ -127,7 +128,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [rejectIncidentEditReason, setRejectIncidentEditReason] = useState<string>('');
   const [approvingIncidentId, setApprovingIncidentId] = useState<string | null>(null);
   const [approvingIncidentEditId, setApprovingIncidentEditId] = useState<string | null>(null);
-  
+  const [pendingDetailType, setPendingDetailType] = useState<PendingDetailType | null>(null);
+  const [pendingDetailData, setPendingDetailData] = useState<any>(null);
+
   const openEditModal = (risk: Risk) => {
     setRiskToEdit(risk);
     setIsModalOpen(true);
@@ -653,6 +656,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 {(currentUser?.role === 'manager' || currentUser?.role === 'admin')
                   ? 'The following risks have edits submitted by users. Approve to apply changes or reject to discard.'
                   : 'Your risk edits are awaiting manager approval.'}
+                {' '}<span className="text-brand-primary">Click a row to view full details.</span>
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
@@ -675,25 +679,30 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       const isApproving = approvingEditRiskId === riskIdStr;
                       const showActions = currentUser?.role === 'manager' || currentUser?.role === 'admin';
                       return (
-                        <tr key={riskIdStr} className="bg-base-100 dark:bg-dark-100">
+                        <tr
+                          key={riskIdStr}
+                          className="bg-base-100 dark:bg-dark-100 cursor-pointer hover:bg-base-200 dark:hover:bg-dark-200"
+                          onClick={() => { setPendingDetailType('risk-edit'); setPendingDetailData(pe); }}
+                        >
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content font-medium">{pe.RiskNo || pe.riskNo || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content max-w-[280px] truncate" title={pe.RiskDescription || pe.riskDescription}>{pe.RiskDescription || pe.riskDescription || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{pe.DepartmentName || pe.departmentName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{pe.ChangedByName || pe.changedByName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{pe.ChangedFields || pe.changedFields || '-'}</td>
                           {showActions && (
-                            <td className="px-3 py-2 text-right">
+                            <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex justify-end gap-2">
                                 <button
                                   type="button"
                                   disabled={isApproving || !onApproveEdit || !firstHistoryId}
-                                  onClick={async () => {
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
                                     if (!onApproveEdit || !firstHistoryId) return;
                                     setApprovingEditRiskId(riskIdStr);
                                     try {
                                       await onApproveEdit(riskIdStr, firstHistoryId);
                                       onRefreshPendingEdits?.();
-                                    } catch (e) {
+                                    } catch (err) {
                                       // Error already logged in parent
                                     } finally {
                                       setApprovingEditRiskId(null);
@@ -706,7 +715,8 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                                 <button
                                   type="button"
                                   disabled={!onRejectEdit}
-                                  onClick={() => {
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setRejectEditRiskId(riskIdStr);
                                     setRejectEditRiskNo(pe.RiskNo || pe.riskNo || '');
                                     setRejectEditReason('');
@@ -737,6 +747,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 {(currentUser?.role === 'manager' || currentUser?.role === 'admin')
                   ? 'New incidents submitted by users. Approve or reject.'
                   : 'Your new incidents are awaiting manager approval.'}
+                {' '}<span className="text-brand-primary">Click a row to view full details.</span>
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[600px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
@@ -757,16 +768,20 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       const isApproving = approvingIncidentId === idStr;
                       const showActions = currentUser?.role === 'manager' || currentUser?.role === 'admin';
                       return (
-                        <tr key={idStr} className="bg-base-100 dark:bg-dark-100">
+                        <tr
+                          key={idStr}
+                          className="bg-base-100 dark:bg-dark-100 cursor-pointer hover:bg-base-200 dark:hover:bg-dark-200"
+                          onClick={() => { setPendingDetailType('incident-new'); setPendingDetailData(inc); }}
+                        >
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content font-medium">{inc.RiskNo || inc.riskNo || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content max-w-[240px] truncate" title={inc.Summary || inc.summary}>{inc.Summary || inc.summary || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{inc.DepartmentName || inc.departmentName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{inc.CreatedByName || inc.createdByName || '-'}</td>
                           {showActions && (
-                            <td className="px-3 py-2 text-right">
+                            <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex justify-end gap-2">
-                                <button type="button" disabled={isApproving || !onApproveIncident} onClick={async () => { if (!onApproveIncident) return; setApprovingIncidentId(idStr); try { await onApproveIncident(idStr); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
-                                <button type="button" disabled={!onRejectIncident} onClick={() => { setRejectIncidentId(idStr); setRejectIncidentReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                                <button type="button" disabled={isApproving || !onApproveIncident} onClick={async (e) => { e.stopPropagation(); if (!onApproveIncident) return; setApprovingIncidentId(idStr); try { await onApproveIncident(idStr); onRefreshPendingEdits?.(); } catch (err) { } finally { setApprovingIncidentId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
+                                <button type="button" disabled={!onRejectIncident} onClick={(e) => { e.stopPropagation(); setRejectIncidentId(idStr); setRejectIncidentReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
                               </div>
                             </td>
                           )}
@@ -789,6 +804,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 {(currentUser?.role === 'manager' || currentUser?.role === 'admin')
                   ? 'Incident edits submitted by users. Approve to apply or reject to discard.'
                   : 'Your incident edits are awaiting manager approval.'}
+                {' '}<span className="text-brand-primary">Click a row to view full details.</span>
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[700px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
@@ -811,17 +827,21 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                       const isApproving = approvingIncidentEditId === incidentIdStr;
                       const showActions = currentUser?.role === 'manager' || currentUser?.role === 'admin';
                       return (
-                        <tr key={incidentIdStr} className="bg-base-100 dark:bg-dark-100">
+                        <tr
+                          key={incidentIdStr}
+                          className="bg-base-100 dark:bg-dark-100 cursor-pointer hover:bg-base-200 dark:hover:bg-dark-200"
+                          onClick={() => { setPendingDetailType('incident-edit'); setPendingDetailData(pe); }}
+                        >
                           <td className="px-3 py-2 text-sm font-medium">{pe.RiskNo || pe.riskNo || '-'}</td>
                           <td className="px-3 py-2 text-sm max-w-[220px] truncate" title={pe.IncidentSummary || pe.incidentSummary}>{pe.IncidentSummary || pe.incidentSummary || '-'}</td>
                           <td className="px-3 py-2 text-sm">{pe.DepartmentName || pe.departmentName || '-'}</td>
                           <td className="px-3 py-2 text-sm">{pe.ChangedByName || pe.changedByName || '-'}</td>
                           <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{pe.ChangedFields || pe.changedFields || '-'}</td>
                           {showActions && (
-                            <td className="px-3 py-2 text-right">
+                            <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                               <div className="flex justify-end gap-2">
-                                <button type="button" disabled={isApproving || !onApproveIncidentEdit || !firstHistoryId} onClick={async () => { if (!onApproveIncidentEdit || !firstHistoryId) return; setApprovingIncidentEditId(incidentIdStr); try { await onApproveIncidentEdit(incidentIdStr, firstHistoryId); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentEditId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
-                                <button type="button" disabled={!onRejectIncidentEdit} onClick={() => { setRejectIncidentEditId(incidentIdStr); setRejectIncidentEditReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                                <button type="button" disabled={isApproving || !onApproveIncidentEdit || !firstHistoryId} onClick={async (e) => { e.stopPropagation(); if (!onApproveIncidentEdit || !firstHistoryId) return; setApprovingIncidentEditId(incidentIdStr); try { await onApproveIncidentEdit(incidentIdStr, firstHistoryId); onRefreshPendingEdits?.(); } catch (err) { } finally { setApprovingIncidentEditId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
+                                <button type="button" disabled={!onRejectIncidentEdit} onClick={(e) => { e.stopPropagation(); setRejectIncidentEditId(incidentIdStr); setRejectIncidentEditReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
                               </div>
                             </td>
                           )}
@@ -1294,6 +1314,30 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
         isOpen={isRiskChangeOpen}
         onClose={() => setIsRiskChangeOpen(false)}
         risk={risks.find(r => r.id === riskChangeId) || null}
+      />
+
+      <PendingActionDetailModal
+        isOpen={!!pendingDetailType && !!pendingDetailData}
+        onClose={() => { setPendingDetailType(null); setPendingDetailData(null); }}
+        type={pendingDetailType}
+        data={pendingDetailData}
+        showActions={currentUser?.role === 'manager' || currentUser?.role === 'admin'}
+        isApproving={
+          pendingDetailType === 'risk-edit' && pendingDetailData
+            ? approvingEditRiskId === String(pendingDetailData.RiskId || pendingDetailData.riskId)
+            : pendingDetailType === 'incident-new' && pendingDetailData
+              ? approvingIncidentId === String(pendingDetailData.IncidentId || pendingDetailData.incidentId)
+              : pendingDetailType === 'incident-edit' && pendingDetailData
+                ? approvingIncidentEditId === String(pendingDetailData.IncidentId || pendingDetailData.incidentId)
+                : false
+        }
+        onApproveEdit={onApproveEdit}
+        onRejectEdit={(riskId, riskNo) => { setRejectEditRiskId(riskId); setRejectEditRiskNo(riskNo || ''); setRejectEditReason(''); }}
+        onApproveIncident={onApproveIncident}
+        onRejectIncident={(id) => { setRejectIncidentId(id); setRejectIncidentReason(''); }}
+        onApproveIncidentEdit={onApproveIncidentEdit}
+        onRejectIncidentEdit={(id) => { setRejectIncidentEditId(id); setRejectIncidentEditReason(''); }}
+        onRefresh={onRefreshPendingEdits}
       />
 
       {/* KPI Modal: List risks by impact */}
