@@ -1339,6 +1339,13 @@ const App: React.FC = () => {
                     closedDateUtc: payload.closedDate || null,
                     createdByUserId: currentUser?.id || null,
                 })
+            }).catch((networkErr: any) => {
+                const msg = String(networkErr?.message || networkErr);
+                throw new Error(
+                    msg.toLowerCase().includes('fetch') || msg.toLowerCase().includes('network')
+                        ? `Network error: cannot reach API at ${API_BASE_URL}. Check that the API server is running and CORS is enabled.`
+                        : msg
+                );
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -1371,7 +1378,7 @@ const App: React.FC = () => {
                 }));
                 setIncidents(mapped as any);
             }
-        } catch (e) {
+        } catch (e: any) {
             // eslint-disable-next-line no-console
             console.error('Failed to create incident', e);
             throw e;
