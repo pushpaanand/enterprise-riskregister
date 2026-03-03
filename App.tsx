@@ -111,6 +111,8 @@ const App: React.FC = () => {
     const [editStatuses, setEditStatuses] = useState<Record<string, any>>({});
     // Pending edit approvals (for managers/admins to see under Pending Action)
     const [pendingEdits, setPendingEdits] = useState<any[]>([]);
+    const [pendingNewIncidents, setPendingNewIncidents] = useState<any[]>([]);
+    const [pendingIncidentEdits, setPendingIncidentEdits] = useState<any[]>([]);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
     const hasAppliedStatusAging = useRef<boolean>(false);
     const [summaryRiskId, setSummaryRiskId] = useState<string | null>(null);
@@ -314,6 +316,8 @@ const App: React.FC = () => {
                             department: i.Department || i.department,
                             createdAt: i.CreatedAtUtc || i.createdAt || new Date().toISOString(),
                             updatedAt: i.UpdatedAtUtc || i.updatedAt || new Date().toISOString(),
+                            approvalStatus: i.ApprovalStatus ?? i.approvalStatus ?? null,
+                            rejectionReason: i.RejectionReason ?? i.rejectionReason ?? null,
                         }));
                         // Do not restrict here; filtering is applied when passing incidents to views
                         setIncidents(mapped as any);
@@ -375,6 +379,29 @@ const App: React.FC = () => {
                 })();
             } else {
                 setPendingEdits([]);
+            }
+
+            // Load pending incident (new + edits) approvals for managers and admins
+            if (currentUser.role === 'manager' || currentUser.role === 'admin') {
+                (async () => {
+                    try {
+                        const params = new URLSearchParams();
+                        if (currentUser.role === 'manager' && currentUser.id) params.set('userId', currentUser.id);
+                        const base = params.toString() ? `?${params.toString()}` : '';
+                        const [newRes, editsRes] = await Promise.all([
+                            fetch(apiUrl(`/incidents/pending-new${base}`)),
+                            fetch(apiUrl(`/incidents/pending-edits${base}`)),
+                        ]);
+                        setPendingNewIncidents(newRes.ok ? (await newRes.json()) : []);
+                        setPendingIncidentEdits(editsRes.ok ? (await editsRes.json()) : []);
+                    } catch (e) {
+                        setPendingNewIncidents([]);
+                        setPendingIncidentEdits([]);
+                    }
+                })();
+            } else {
+                setPendingNewIncidents([]);
+                setPendingIncidentEdits([]);
             }
         }
     }, [currentUser, adminDept, adminStatus, adminDeptOptions, userDept, userDeptOptions, managerDept, managerDeptOptions, refreshTrigger]);
@@ -497,6 +524,62 @@ const App: React.FC = () => {
             console.error('Reject edit failed', e);
             throw e;
         }
+    }, [currentUser?.id]);
+
+    const handleApproveIncident = useCallback(async (incidentId: string) => {
+        if (!currentUser?.id) return;
+        const res = await fetch(apiUrl(`/incidents/${incidentId}/approve`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approvedByUserId: currentUser.id }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error((data as any)?.error || 'Approve failed');
+        }
+        setRefreshTrigger(r => r + 1);
+    }, [currentUser?.id]);
+
+    const handleRejectIncident = useCallback(async (incidentId: string, rejectionReason?: string) => {
+        if (!currentUser?.id) return;
+        const res = await fetch(apiUrl(`/incidents/${incidentId}/reject`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rejectionReason: rejectionReason || null }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error((data as any)?.error || 'Reject failed');
+        }
+        setRefreshTrigger(r => r + 1);
+    }, [currentUser?.id]);
+
+    const handleApproveIncidentEdit = useCallback(async (incidentId: string, historyId: number) => {
+        if (!currentUser?.id) return;
+        const res = await fetch(apiUrl(`/incidents/${incidentId}/approve-edit`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ historyId, approvedByUserId: currentUser.id }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error((data as any)?.error || 'Approve failed');
+        }
+        setRefreshTrigger(r => r + 1);
+    }, [currentUser?.id]);
+
+    const handleRejectIncidentEdit = useCallback(async (incidentId: string, rejectionReason?: string) => {
+        if (!currentUser?.id) return;
+        const res = await fetch(apiUrl(`/incidents/${incidentId}/reject-edit`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approvedByUserId: currentUser.id, rejectionReason: rejectionReason || null }),
+        });
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error((data as any)?.error || 'Reject failed');
+        }
+        setRefreshTrigger(r => r + 1);
     }, [currentUser?.id]);
 
     const handleLoggedIn = (user: User) => {
@@ -1240,36 +1323,32 @@ const App: React.FC = () => {
     // Incident CRUD
     const handleAddIncident = async (payload: Omit<Incident, 'id' | 'createdAt' | 'updatedAt' | 'department' | 'createdByUserId'>) => {
         try {
-            const risk = risks.find(r => r.id === payload.riskId);
-            const department = currentUser?.department || risk?.department || 'General';
-            await fetch(apiUrl('/incidents'), {
+            const res = await fetch(apiUrl('/incidents'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    RiskId: payload.riskId,
-                    Summary: payload.summary,
-                    Description: payload.description,
-                    MitigationSteps: payload.mitigationSteps,
-                    CurrentStatusText: payload.currentStatusText,
-                    OccurredAtUtc: payload.occurredAt,
-                    ClosedDateUtc: payload.closedDate || null,
-                    CreatedByUserId: currentUser?.id,
-                    Department: department,
+                    riskId: payload.riskId,
+                    summary: payload.summary,
+                    description: payload.description,
+                    mitigationSteps: payload.mitigationSteps || null,
+                    currentStatusText: payload.currentStatusText || null,
+                    occurredAtUtc: payload.occurredAt,
+                    closedDateUtc: payload.closedDate || null,
+                    createdByUserId: currentUser?.id || null,
                 })
             });
-        } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('Failed to create incident', e);
-        }
-        // Refresh incidents (simple re-fetch path)
-        try {
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error((err as any)?.error || `Create incident failed: ${res.status}`);
+            }
+            // Refresh incidents list after successful create
             const params = new URLSearchParams();
             if (currentUser?.role === 'user') params.set('createdBy', currentUser.id);
             if (currentUser?.role === 'manager' && currentUser.department) params.set('department', currentUser.department);
             if (currentUser?.role === 'admin' && adminDept && adminDept !== 'All') params.set('department', adminDept);
-            const url = `${API_BASE_URL}/incidents${params.toString() ? `?${params.toString()}` : ''}`;
-            const res = await fetch(url);
-            const data = await res.json();
+            const listUrl = `${API_BASE_URL}/incidents${params.toString() ? `?${params.toString()}` : ''}`;
+            const listRes = await fetch(listUrl);
+            const data = await listRes.json();
             if (Array.isArray(data)) {
                 const mapped = data.map((i: any) => ({
                     id: i.IncidentId || i.id,
@@ -1284,10 +1363,16 @@ const App: React.FC = () => {
                     department: i.Department || i.department,
                     createdAt: i.CreatedAtUtc || i.createdAt || new Date().toISOString(),
                     updatedAt: i.UpdatedAtUtc || i.updatedAt || new Date().toISOString(),
+                    approvalStatus: i.ApprovalStatus ?? i.approvalStatus ?? null,
+                    rejectionReason: i.RejectionReason ?? i.rejectionReason ?? null,
                 }));
                 setIncidents(mapped as any);
             }
-        } catch {}
+        } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to create incident', e);
+            throw e;
+        }
     };
 
     const handleUpdateIncident = async (updated: Incident) => {
@@ -1305,6 +1390,7 @@ const App: React.FC = () => {
                     currentStatusText: updated.currentStatusText,
                     occurredAt: updated.occurredAt,
                     closedDate: updated.closedDate || null,
+                    changedByUserId: currentUser?.id || null,
                 })
             });
         } catch (e) {
@@ -1502,6 +1588,12 @@ const App: React.FC = () => {
                             onRefreshPendingEdits={handleRefreshPendingEdits}
                             onApproveEdit={handleApproveEdit}
                             onRejectEdit={handleRejectEdit}
+                            pendingNewIncidents={pendingNewIncidents}
+                            pendingIncidentEdits={pendingIncidentEdits}
+                            onApproveIncident={handleApproveIncident}
+                            onRejectIncident={handleRejectIncident}
+                            onApproveIncidentEdit={handleApproveIncidentEdit}
+                            onRejectIncidentEdit={handleRejectIncidentEdit}
                             onApproveRisk={(risk) => handleSaveRisk({
                                 id: risk.id,
                                 description: risk.description,
@@ -1684,6 +1776,12 @@ const App: React.FC = () => {
                                     onRefreshPendingEdits={handleRefreshPendingEdits}
                                     onApproveEdit={handleApproveEdit}
                                     onRejectEdit={handleRejectEdit}
+                                    pendingNewIncidents={pendingNewIncidents}
+                                    pendingIncidentEdits={pendingIncidentEdits}
+                                    onApproveIncident={handleApproveIncident}
+                                    onRejectIncident={handleRejectIncident}
+                                    onApproveIncidentEdit={handleApproveIncidentEdit}
+                                    onRejectIncidentEdit={handleRejectIncidentEdit}
                                     onApproveRisk={(risk) => handleSaveRisk({
                                         id: risk.id,
                                         description: risk.description,
@@ -1847,6 +1945,12 @@ const App: React.FC = () => {
                                     onRefreshPendingEdits={handleRefreshPendingEdits}
                                     onApproveEdit={handleApproveEdit}
                                     onRejectEdit={handleRejectEdit}
+                                    pendingNewIncidents={pendingNewIncidents}
+                                    pendingIncidentEdits={pendingIncidentEdits}
+                                    onApproveIncident={handleApproveIncident}
+                                    onRejectIncident={handleRejectIncident}
+                                    onApproveIncidentEdit={handleApproveIncidentEdit}
+                                    onRejectIncidentEdit={handleRejectIncidentEdit}
                                     incidents={opsIncidents}
                                     incidentHistory={incidentHistory}
                                     onAddIncident={handleAddIncident}
@@ -1972,6 +2076,12 @@ const App: React.FC = () => {
                                     onRefreshPendingEdits={handleRefreshPendingEdits}
                                     onApproveEdit={handleApproveEdit}
                                     onRejectEdit={handleRejectEdit}
+                                    pendingNewIncidents={pendingNewIncidents}
+                                    pendingIncidentEdits={pendingIncidentEdits}
+                                    onApproveIncident={handleApproveIncident}
+                                    onRejectIncident={handleRejectIncident}
+                                    onApproveIncidentEdit={handleApproveIncidentEdit}
+                                    onRejectIncidentEdit={handleRejectIncidentEdit}
                                     incidents={filteredIncidents}
                                     incidentHistory={incidentHistory}
                                     onAddIncident={handleAddIncident}
@@ -2084,6 +2194,12 @@ const App: React.FC = () => {
                                 onRefreshPendingEdits={handleRefreshPendingEdits}
                                 onApproveEdit={handleApproveEdit}
                                 onRejectEdit={handleRejectEdit}
+                                pendingNewIncidents={pendingNewIncidents}
+                                pendingIncidentEdits={pendingIncidentEdits}
+                                onApproveIncident={handleApproveIncident}
+                                onRejectIncident={handleRejectIncident}
+                                onApproveIncidentEdit={handleApproveIncidentEdit}
+                                onRejectIncidentEdit={handleRejectIncidentEdit}
                                 onApproveRisk={(risk) => handleSaveRisk({
                                     id: risk.id,
                                     description: risk.description,

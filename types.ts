@@ -75,6 +75,8 @@ export interface Incident {
   department?: string;
   createdAt: string;
   updatedAt: string;
+  approvalStatus?: string | null;   // Pending | Approved | Rejected (for user-created flow)
+  rejectionReason?: string | null;
 }
 
 export interface IncidentHistory {

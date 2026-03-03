@@ -49,9 +49,16 @@ interface RiskDashboardProps {
   onRefreshPendingEdits?: () => void;
   onApproveEdit?: (riskId: string, historyId: number) => Promise<void>;
   onRejectEdit?: (riskId: string, rejectionReason?: string) => Promise<void>;
+  // Pending incidents (new + edits) for manager/admin
+  pendingNewIncidents?: any[];
+  pendingIncidentEdits?: any[];
+  onApproveIncident?: (incidentId: string) => Promise<void>;
+  onRejectIncident?: (incidentId: string, rejectionReason?: string) => Promise<void>;
+  onApproveIncidentEdit?: (incidentId: string, historyId: number) => Promise<void>;
+  onRejectIncidentEdit?: (incidentId: string, rejectionReason?: string) => Promise<void>;
 }
 
-const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept, editStatuses = {}, pendingEdits = [], onRefreshPendingEdits, onApproveEdit, onRejectEdit }) => {
+const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, currentUser, onSaveRisk, onDeleteRisk, onApproveRisk, onRejectRisk, incidents = [], incidentHistory = [], onAddIncident, onUpdateIncident, aiSummary, aiLoading, onRefreshSummary, aiIncidentsSummary, aiIncidentsLoading, onRefreshIncidentsSummary, onSetSummaryRiskId, adminDeptOptions = [], adminDept = 'All', onChangeAdminDept, managerDeptOptions = [], managerDept = 'All', onChangeManagerDept, userDeptOptions = [], userDept = 'All', onChangeUserDept, editStatuses = {}, pendingEdits = [], onRefreshPendingEdits, onApproveEdit, onRejectEdit, pendingNewIncidents = [], pendingIncidentEdits = [], onApproveIncident, onRejectIncident, onApproveIncidentEdit, onRejectIncidentEdit }) => {
   // Debug logging
   // Derive effective department options (fallback to assignedDepartments if needed)
   const effectiveManagerDepts = React.useMemo(() => {
@@ -114,6 +121,12 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
   const [rejectEditRiskNo, setRejectEditRiskNo] = useState<string>('');
   const [rejectEditReason, setRejectEditReason] = useState<string>('');
   const [approvingEditRiskId, setApprovingEditRiskId] = useState<string | null>(null);
+  const [rejectIncidentId, setRejectIncidentId] = useState<string | null>(null);
+  const [rejectIncidentReason, setRejectIncidentReason] = useState<string>('');
+  const [rejectIncidentEditId, setRejectIncidentEditId] = useState<string | null>(null);
+  const [rejectIncidentEditReason, setRejectIncidentEditReason] = useState<string>('');
+  const [approvingIncidentId, setApprovingIncidentId] = useState<string | null>(null);
+  const [approvingIncidentEditId, setApprovingIncidentEditId] = useState<string | null>(null);
   
   const openEditModal = (risk: Risk) => {
     setRiskToEdit(risk);
@@ -256,7 +269,9 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             {(() => {
               const raisedCount = risks.filter(r => r.status === 'Raised').length;
               const editCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingEdits?.length || 0) : 0;
-              const pendingCount = raisedCount + editCount;
+              const incidentNewCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingNewIncidents?.length || 0) : 0;
+              const incidentEditCount = (currentUser?.role === 'manager' || currentUser?.role === 'admin') ? (pendingIncidentEdits?.length || 0) : 0;
+              const pendingCount = raisedCount + editCount + incidentNewCount + incidentEditCount;
               if (pendingCount > 0) {
                 return (
                   <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
@@ -703,6 +718,95 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             </div>
           )}
 
+          {/* Pending new incidents (user-created, awaiting approval) */}
+          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && pendingNewIncidents && pendingNewIncidents.length > 0 && (
+            <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
+              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">Pending new incidents</h3>
+              <p className="text-sm text-base-content-muted dark:text-dark-content-muted mb-4">
+                New incidents submitted by users. Approve or reject.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
+                  <thead className="bg-brand-secondary">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Risk</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Summary</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Created by</th>
+                      <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-base-300 dark:divide-dark-300">
+                    {pendingNewIncidents.map((inc: any) => {
+                      const idStr = String(inc.IncidentId || inc.incidentId || '');
+                      const isApproving = approvingIncidentId === idStr;
+                      return (
+                        <tr key={idStr} className="bg-base-100 dark:bg-dark-100">
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content font-medium">{inc.RiskNo || inc.riskNo || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content max-w-[240px] truncate" title={inc.Summary || inc.summary}>{inc.Summary || inc.summary || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{inc.DepartmentName || inc.departmentName || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content dark:text-dark-content">{inc.CreatedByName || inc.createdByName || '-'}</td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button type="button" disabled={isApproving || !onApproveIncident} onClick={async () => { if (!onApproveIncident) return; setApprovingIncidentId(idStr); try { await onApproveIncident(idStr); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
+                              <button type="button" disabled={!onRejectIncident} onClick={() => { setRejectIncidentId(idStr); setRejectIncidentReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pending incident edits */}
+          {(currentUser?.role === 'manager' || currentUser?.role === 'admin') && pendingIncidentEdits && pendingIncidentEdits.length > 0 && (
+            <div className="bg-base-200 dark:bg-dark-200 rounded-lg shadow p-6">
+              <h3 className="text-lg font-medium leading-6 text-base-content dark:text-dark-content mb-4">Pending incident edits</h3>
+              <p className="text-sm text-base-content-muted dark:text-dark-content-muted mb-4">
+                Incident edits submitted by users. Approve to apply or reject to discard.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[700px] border border-base-300 dark:border-dark-300 rounded-lg overflow-hidden">
+                  <thead className="bg-brand-secondary">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Risk</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Incident</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Changed by</th>
+                      <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Fields</th>
+                      <th className="px-3 py-2 text-right text-sm font-semibold text-brand-primary">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-base-300 dark:divide-dark-300">
+                    {pendingIncidentEdits.map((pe: any) => {
+                      const incidentIdStr = String(pe.IncidentId || pe.incidentId || '');
+                      const firstHistoryId = pe.pendingChanges?.[0]?.IncidentHistoryId ?? pe.pendingChanges?.[0]?.incidentHistoryId;
+                      const isApproving = approvingIncidentEditId === incidentIdStr;
+                      return (
+                        <tr key={incidentIdStr} className="bg-base-100 dark:bg-dark-100">
+                          <td className="px-3 py-2 text-sm font-medium">{pe.RiskNo || pe.riskNo || '-'}</td>
+                          <td className="px-3 py-2 text-sm max-w-[220px] truncate" title={pe.IncidentSummary || pe.incidentSummary}>{pe.IncidentSummary || pe.incidentSummary || '-'}</td>
+                          <td className="px-3 py-2 text-sm">{pe.DepartmentName || pe.departmentName || '-'}</td>
+                          <td className="px-3 py-2 text-sm">{pe.ChangedByName || pe.changedByName || '-'}</td>
+                          <td className="px-3 py-2 text-sm text-base-content-muted dark:text-dark-content-muted">{pe.ChangedFields || pe.changedFields || '-'}</td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button type="button" disabled={isApproving || !onApproveIncidentEdit || !firstHistoryId} onClick={async () => { if (!onApproveIncidentEdit || !firstHistoryId) return; setApprovingIncidentEditId(incidentIdStr); try { await onApproveIncidentEdit(incidentIdStr, firstHistoryId); onRefreshPendingEdits?.(); } catch (e) { } finally { setApprovingIncidentEditId(null); } }} className="px-3 py-1.5 text-sm rounded-md bg-green-600 text-white hover:bg-green-500 disabled:opacity-50">{isApproving ? 'Approving…' : 'Approve'}</button>
+                              <button type="button" disabled={!onRejectIncidentEdit} onClick={() => { setRejectIncidentEditId(incidentIdStr); setRejectIncidentEditReason(''); }} className="px-3 py-1.5 text-sm rounded-md border border-red-600 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50">Reject</button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* Filters for pending actions (Raised risks) */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
@@ -932,15 +1036,20 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 risks={risks}
                 riskId={incidentRiskId}
                 incident={editingIncident || undefined}
-                onSave={(payload) => {
-                  if ((payload as any).id) {
-                    onUpdateIncident && onUpdateIncident(payload as Incident);
-                  } else {
-                    onAddIncident && onAddIncident(payload as any);
+                onSave={async (payload) => {
+                  try {
+                    if ((payload as any).id) {
+                      onUpdateIncident && onUpdateIncident(payload as Incident);
+                    } else {
+                      onAddIncident && await onAddIncident(payload as any);
+                    }
+                    setEditingIncident(null);
+                    setIncidentRiskId(undefined);
+                    setIsAddingIncident(false);
+                  } catch (e) {
+                    // eslint-disable-next-line no-alert
+                    alert((e as Error)?.message || 'Failed to save incident');
                   }
-                  setEditingIncident(null);
-                  setIncidentRiskId(undefined);
-                  setIsAddingIncident(false);
                 }}
                 onCancel={() => { setEditingIncident(null); setIncidentRiskId(undefined); setIsAddingIncident(false); }}
               />
@@ -1085,6 +1194,34 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
             >
               Reject edit
             </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(rejectIncidentId)} onClose={() => { setRejectIncidentId(null); setRejectIncidentReason(''); }} title="Reject new incident">
+        <div className="space-y-4">
+          <p className="text-sm text-base-content dark:text-dark-content">Optionally provide a reason for rejecting this incident.</p>
+          <div>
+            <label className="block text-sm font-medium mb-1">Reason (optional)</label>
+            <textarea value={rejectIncidentReason} onChange={(e) => setRejectIncidentReason(e.target.value)} rows={3} className="w-full rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-2 text-sm" placeholder="Reason for rejection..." />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => { setRejectIncidentId(null); setRejectIncidentReason(''); }} className="px-3 py-2 text-sm rounded-md border border-base-300 dark:border-dark-300">Cancel</button>
+            <button type="button" onClick={async () => { if (rejectIncidentId && onRejectIncident) { await onRejectIncident(rejectIncidentId, rejectIncidentReason.trim() || undefined); onRefreshPendingEdits?.(); } setRejectIncidentId(null); setRejectIncidentReason(''); }} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-500">Reject incident</button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={Boolean(rejectIncidentEditId)} onClose={() => { setRejectIncidentEditId(null); setRejectIncidentEditReason(''); }} title="Reject incident edit">
+        <div className="space-y-4">
+          <p className="text-sm text-base-content dark:text-dark-content">Optionally provide a reason for rejecting this incident edit.</p>
+          <div>
+            <label className="block text-sm font-medium mb-1">Reason (optional)</label>
+            <textarea value={rejectIncidentEditReason} onChange={(e) => setRejectIncidentEditReason(e.target.value)} rows={3} className="w-full rounded-md border border-base-300 dark:border-dark-300 bg-base-100 dark:bg-dark-100 px-3 py-2 text-sm" placeholder="Reason for rejection..." />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={() => { setRejectIncidentEditId(null); setRejectIncidentEditReason(''); }} className="px-3 py-2 text-sm rounded-md border border-base-300 dark:border-dark-300">Cancel</button>
+            <button type="button" onClick={async () => { if (rejectIncidentEditId && onRejectIncidentEdit) { await onRejectIncidentEdit(rejectIncidentEditId, rejectIncidentEditReason.trim() || undefined); onRefreshPendingEdits?.(); } setRejectIncidentEditId(null); setRejectIncidentEditReason(''); }} className="px-3 py-2 text-sm rounded-md bg-red-600 text-white hover:bg-red-500">Reject edit</button>
           </div>
         </div>
       </Modal>
