@@ -349,6 +349,8 @@ const App: React.FC = () => {
             }
 
             // Load pending edit approvals for managers and admins (shown in Pending Action tab)
+            // Manager: pass userId so API returns only their department(s)' pending edits
+            // Admin: do not pass userId so API returns ALL pending edits across the org
             if (currentUser.role === 'manager' || currentUser.role === 'admin') {
                 (async () => {
                     try {
@@ -356,9 +358,7 @@ const App: React.FC = () => {
                         if (currentUser.role === 'manager' && currentUser.id) {
                             params.set('userId', currentUser.id);
                         }
-                        if (currentUser.role === 'admin' && adminDept && adminDept !== 'All') {
-                            // departmentId filter would need department GUID; optional
-                        }
+                        // Admin: no filter = all pending edits; manager: userId = only their depts
                         const url = apiUrl(`/risks/pending-edits${params.toString() ? `?${params.toString()}` : ''}`);
                         const res = await fetch(url);
                         if (res.ok) {
