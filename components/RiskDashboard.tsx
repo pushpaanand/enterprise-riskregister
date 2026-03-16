@@ -454,7 +454,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
+              <label className="text-sm text-base-content dark:text-dark-content">Type</label>
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
@@ -551,7 +551,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
           {/* Filters (status fixed to New; identification still applies) */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
+              <label className="text-sm text-base-content dark:text-dark-content">Type</label>
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
@@ -857,7 +857,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
           {/* Filters for pending actions (Raised risks) */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
+              <label className="text-sm text-base-content dark:text-dark-content">Type</label>
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
@@ -967,7 +967,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
           {/* Filters for rejected risks */}
           <div className="mb-3 flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
-              <label className="text-sm text-base-content dark:text-dark-content">Identification</label>
+              <label className="text-sm text-base-content dark:text-dark-content">Type</label>
               <select
                 value={identificationFilter}
                 onChange={(e) => setIdentificationFilter(e.target.value)}
@@ -1356,7 +1356,7 @@ const RiskDashboard: React.FC<RiskDashboardProps> = ({ risks, owners, users, cur
                 {currentUser?.role === 'admin' && (
                   <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Department</th>
                 )}
-                <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Identification</th>
+                <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Type</th>
                 <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Created</th>
                 <th className="px-3 py-2 text-left text-sm font-semibold text-brand-primary">Updated</th>
               </tr>

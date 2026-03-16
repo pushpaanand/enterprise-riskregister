@@ -15,7 +15,7 @@ const riskColumns = [
   { key: 'category', label: 'Category' },
   { key: 'description', label: 'Description' },
   { key: 'department', label: 'Department' },
-  { key: 'identification', label: 'Identification' },
+  { key: 'identification', label: 'Type' },
   { key: 'existingControlInPlace', label: 'Existing Control' },
   { key: 'planOfAction', label: 'Plan of Action' },
   { key: 'impact', label: 'Impact' },

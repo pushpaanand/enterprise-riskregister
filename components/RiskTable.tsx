@@ -148,7 +148,7 @@ const RiskTable: React.FC<RiskTableProps> = ({ risks, owners, users, currentUser
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary min-w-[450px]">Risk Description</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Impact</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Likelihood</th>
-            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Identification</th>
+            <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Type</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">KRI</th>            
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Existing Control</th>
             <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-brand-primary">Plan of Action</th>
