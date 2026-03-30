@@ -313,7 +313,7 @@ Production: https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.
 - `POST /api/auth/azure-login` - Azure AD login
 
 #### Risks
-- `GET /api/risks?userId={id}&role={role}` - Get risks (filtered by role)
+- `GET /api/risks?userId={id}&role={role}&userName={name}` - Get risks (filtered by role, with READ audit metadata)
 - `POST /api/risks` - Create risk
 - `PUT /api/risks/[id]` - Update risk (role-based: user edits go to pending, manager edits save directly)
 - `DELETE /api/risks/[id]` - Delete risk
@@ -329,7 +329,7 @@ Production: https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.
 - `GET /api/incidents/[id]/history` - Get incident history
 
 #### Users
-- `GET /api/users` - Get all users (with assigned departments)
+- `GET /api/users?requestedBy={userId}&requestedByName={name}` - Get all users (with assigned departments, with READ audit metadata)
 - `POST /api/users` - Create user
 - `PUT /api/users/[id]` - Update user
 - `DELETE /api/users/[id]` - Delete user
@@ -515,6 +515,17 @@ Production: https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.
 - **Responsive Design**: Works on different screen sizes
 - **Auto-scroll**: Automatic scrolling to relevant sections
 - **KPI Cards**: Visual risk statistics
+- **Month-wise Audit Export**: Audit Logs page includes month picker for export/download
+- **Audit CSV Download**: One-click CSV download for month/filtered logs
+- **READ Operation Filter**: Audit Logs operation filter includes `READ`
+- **Unified Risk Filters Row**: Department/status/identification/search aligned in one line for user/manager views
+
+### 8. Audit Logging Enhancements (Latest)
+- **GET/READ Audit Support**: `READ` operation added for API access logging
+- **GET APIs Audited**: `/api/users` and `/api/risks` write audit entries on read
+- **Requester Metadata**: Supports login id/name from query params (`requestedBy`, `requestedByName`, `userName`)
+- **Network Metadata**: IP address and User-Agent captured in audit logs
+- **GUID Safety**: Audit logger sanitizes invalid GUID values to avoid SQL uniqueidentifier conversion failures
 
 ---
 
@@ -605,6 +616,7 @@ Production: https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.
 - Users/managers can have multiple departments
 - Frontend dropdown to select active department
 - Backend filters risks by all assigned departments
+- Dropdown visibility/fallback logic standardized for multi-department users
 
 ### AI Summary Generation
 - Categorizes risks into:
@@ -613,6 +625,34 @@ Production: https://riskmanagement-ggb0ard8ekbmfjab.southindia-01.azurewebsites.
   - Other Issues (Non-Severe)
 - Uses Azure OpenAI / Google GenAI
 - Structured format with specific messaging
+
+---
+
+## 🆕 Recent Updates (v1.1)
+
+### 1) GET API Audit Logs (`READ`)
+- Added `READ` as an audit operation.
+- Implemented READ audit logging in:
+  - `GET /api/users`
+  - `GET /api/risks`
+- Captures:
+  - login/requester id and name (when provided)
+  - IP address
+  - User-Agent
+  - response record count in `AdditionalInfo`
+- Added GUID sanitization in audit logger to prevent conversion errors on uniqueidentifier columns.
+
+### 2) Audit Logs Export & Download
+- Added month picker (`type="month"`) in Audit Logs page.
+- Added **Download CSV** button for month-wise/filtered audit logs.
+- **Export PDF** now supports month-wise filtering.
+- Added `READ` in operation filter dropdown.
+
+### 3) Multi-Department Dropdown Fixes
+- Fixed user/manager department dropdown display for multi-department users.
+- Ensured user view receives and uses `userDeptOptions`, selected value, and change handler.
+- Added fallback department options from assigned departments when API options are temporarily empty.
+- Aligned filters into one row (Department + Status + Identification + Search).
 
 ---
 
@@ -664,6 +704,6 @@ enterprise-risk-management-dashboard/
 
 ---
 
-*Last Updated: 2025-01-XX*
-*Version: 1.0.0*
+*Last Updated: 2026-02-25*
+*Version: 1.1.0*
 
