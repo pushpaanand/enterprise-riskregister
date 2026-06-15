@@ -1,0 +1,4 @@
+DB_SERVER: riskmanage.database.windows.net
+DB_NAME:  riskmanagement
+DB_USER:  riskmanagement
+DB_PASSWORD: RiskManage@123
