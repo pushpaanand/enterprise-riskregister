@@ -984,6 +984,9 @@ const App: React.FC = () => {
                     'operation': 'OP',
                     'facilities': 'FC',
                     'facility': 'FC',
+                    'entity-level': 'E',
+                    'entity level': 'E',
+                    'entity': 'E',
                     'finance': 'F',
                     'finance & accounts': 'F',
                     'finance and accounts': 'F',
@@ -997,20 +1000,28 @@ const App: React.FC = () => {
                     'pharmacy': 'PH',
                 };
                 
-                // Normalize input: remove extra spaces and convert to lowercase
-                const lowerInput = normalized.toLowerCase().replace(/\s+/g, ' ').trim();
+                // Normalize input: hyphens become spaces so "Entity-level" matches "entity level"
+                const lowerInput = normalized.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+                const inputWithoutSpaces = lowerInput.replace(/\s+/g, '');
                 
                 // Check for exact matches (case-insensitive)
                 if (departmentPrefixMap[lowerInput]) {
                     return departmentPrefixMap[lowerInput];
                 }
+                if (departmentPrefixMap[inputWithoutSpaces]) {
+                    return departmentPrefixMap[inputWithoutSpaces];
+                }
                 
-                // Check for partial matches (e.g., "Clinical Department" contains "clinical")
-                // Also check without spaces for variations like "InformationSecurity"
-                const inputWithoutSpaces = lowerInput.replace(/\s+/g, '');
-                for (const [key, prefix] of Object.entries(departmentPrefixMap)) {
-                    const keyWithoutSpaces = key.replace(/\s+/g, '');
-                    if (lowerInput.includes(key) || inputWithoutSpaces.includes(keyWithoutSpaces)) {
+                // Partial matches, longest key first. Short keys like "it" are exact-only
+                // so "Entity-level" is not treated as Information Technology.
+                const entries = Object.entries(departmentPrefixMap).sort((a, b) => b[0].length - a[0].length);
+                for (const [key, prefix] of entries) {
+                    const keyNorm = key.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+                    if (keyNorm.length <= 2) continue;
+                    const keyWithoutSpaces = keyNorm.replace(/\s+/g, '');
+                    const escaped = keyNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const wordRe = new RegExp(`(^|\\s)${escaped}(\\s|$)`);
+                    if (wordRe.test(lowerInput) || (keyWithoutSpaces.length > 2 && inputWithoutSpaces.includes(keyWithoutSpaces))) {
                         return prefix;
                     }
                 }

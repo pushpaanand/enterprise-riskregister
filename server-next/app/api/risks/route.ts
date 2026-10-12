@@ -32,22 +32,33 @@ function derivePrefixFromName(input: string | null | undefined): string {
     'operation': 'OP',
     'facilities': 'FC',
     'facility': 'FC',
+    'entity-level': 'E',
+    'entity level': 'E',
+    'entity': 'E',
   };
   
-  // Normalize input: remove extra spaces and convert to lowercase
-  const lowerInput = normalized.toLowerCase().replace(/\s+/g, ' ').trim();
+  // Normalize input: hyphens/underscores become spaces so "Entity-level" matches "entity level"
+  const lowerInput = normalized.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const inputWithoutSpaces = lowerInput.replace(/\s+/g, '');
   
   // Check for exact matches (case-insensitive)
   if (departmentPrefixMap[lowerInput]) {
     return departmentPrefixMap[lowerInput];
   }
+  if (departmentPrefixMap[inputWithoutSpaces]) {
+    return departmentPrefixMap[inputWithoutSpaces];
+  }
   
-  // Check for partial matches (e.g., "Clinical Department" contains "clinical")
-  // Also check without spaces for variations like "InformationSecurity"
-  const inputWithoutSpaces = lowerInput.replace(/\s+/g, '');
-  for (const [key, prefix] of Object.entries(departmentPrefixMap)) {
-    const keyWithoutSpaces = key.replace(/\s+/g, '');
-    if (lowerInput.includes(key) || inputWithoutSpaces.includes(keyWithoutSpaces)) {
+  // Partial matches, longest key first. Short keys (e.g. "it") are exact-only,
+  // otherwise "Entity-level" matches "it" and is numbered as IT001.
+  const entries = Object.entries(departmentPrefixMap).sort((a, b) => b[0].length - a[0].length);
+  for (const [key, prefix] of entries) {
+    const keyNorm = key.toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (keyNorm.length <= 2) continue;
+    const keyWithoutSpaces = keyNorm.replace(/\s+/g, '');
+    const escaped = keyNorm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordRe = new RegExp(`(^|\\s)${escaped}(\\s|$)`);
+    if (wordRe.test(lowerInput) || (keyWithoutSpaces.length > 2 && inputWithoutSpaces.includes(keyWithoutSpaces))) {
       return prefix;
     }
   }
@@ -188,6 +199,19 @@ export async function POST(req: Request) {
     }
   };
 
+  // Honor the department chosen on the form (multi-department users).
+  // Do this before falling back to the user's primary department.
+  if (departmentName && !departmentId) {
+    const depByChosenName = await pool
+      .request()
+      .input('dn', departmentName)
+      .query(`SELECT TOP 1 DepartmentId, Name FROM dbo.Departments WHERE Name = @dn`);
+    if (depByChosenName.recordset.length) {
+      departmentId = depByChosenName.recordset[0].DepartmentId;
+      departmentName = depByChosenName.recordset[0].Name;
+    }
+  }
+
   if (departmentId && !departmentName) {
     const depRow = await pool
       .request()
@@ -255,18 +279,19 @@ export async function POST(req: Request) {
   const prefixPattern = `${prefix}%`;
 
   if (!riskNo && departmentId) {
-    // For 2-letter prefix, extract numeric part starting from position 3 (e.g., "OP001" -> "001")
+    // Prefix length varies (E025 is 1 letter, OP015 is 2). Read digits after the prefix.
     const rsNo = await pool
       .request()
       .input('dep', departmentId)
       .input('prefix', prefixPattern)
+      .input('prefixLen', prefix.length)
       .query(`
-        SELECT MAX(CAST(SUBSTRING(RiskNo, 3, 10) AS INT)) AS MaxNo
+        SELECT MAX(TRY_CAST(SUBSTRING(RiskNo, @prefixLen + 1, 10) AS INT)) AS MaxNo
         FROM dbo.Risks
         WHERE DepartmentId = @dep
-          AND UPPER(RiskNo) LIKE @prefix
-          AND LEN(RiskNo) >= 5
-          AND ISNUMERIC(SUBSTRING(RiskNo, 3, 10)) = 1
+          AND UPPER(RiskNo) LIKE UPPER(@prefix)
+          AND LEN(RiskNo) > @prefixLen
+          AND TRY_CAST(SUBSTRING(RiskNo, @prefixLen + 1, 10) AS INT) IS NOT NULL
       `);
     const nextNo = (rsNo.recordset[0]?.MaxNo || 0) + 1;
     riskNo = `${prefix}${String(nextNo).padStart(3, '0')}`;
